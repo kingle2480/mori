@@ -457,14 +457,17 @@ final class WorkspaceManager {
 
     /// Mark a worktree as unavailable and persist. Also deselect if currently selected.
     private func softDeleteWorktree(at index: Int) {
-        appState.worktrees[index].status = .unavailable
-        try? worktreeRepo.save(appState.worktrees[index])
+        let worktree = appState.worktrees[index]
+        let wasSelected = appState.uiState.selectedWorktreeId == worktree.id
+
+        // Remove from state and database
+        appState.worktrees.remove(at: index)
+        try? worktreeRepo.delete(id: worktree.id)
 
         // If this was the selected worktree, clear selection
-        if appState.uiState.selectedWorktreeId == appState.worktrees[index].id {
+        if wasSelected {
             appState.uiState.selectedWorktreeId = nil
             appState.uiState.selectedWindowId = nil
-            // Auto-select another active worktree
             let active = appState.worktreesForSelectedProject.filter { $0.status == .active }
             if let first = active.first {
                 selectWorktree(first.id)
