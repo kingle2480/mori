@@ -1,92 +1,167 @@
 import SwiftUI
 import MoriCore
 
-/// Sidebar showing worktrees as sections with their tmux windows as rows.
+/// Unified sidebar: all projects as flat sections, worktrees as two-line rows,
+/// windows indented below, and action footer at the bottom.
 public struct WorktreeSidebarView: View {
+    private let projects: [Project]
+    private let selectedProjectId: UUID?
     private let worktrees: [Worktree]
     private let windows: [RuntimeWindow]
     private let selectedWorktreeId: UUID?
     private let selectedWindowId: String?
+    private let onSelectProject: ((UUID) -> Void)?
     private let onSelectWorktree: (UUID) -> Void
     private let onSelectWindow: (String) -> Void
     private let onCreateWorktree: ((String) -> Void)?
     private let onRemoveWorktree: ((UUID) -> Void)?
+    private let onAddProject: (() -> Void)?
+    private let onOpenSettings: (() -> Void)?
 
     @State private var isCreatingWorktree = false
     @State private var newBranchName = ""
     @State private var isSubmitting = false
 
     public init(
+        projects: [Project] = [],
+        selectedProjectId: UUID? = nil,
         worktrees: [Worktree],
         windows: [RuntimeWindow],
         selectedWorktreeId: UUID?,
         selectedWindowId: String?,
+        onSelectProject: ((UUID) -> Void)? = nil,
         onSelectWorktree: @escaping (UUID) -> Void,
         onSelectWindow: @escaping (String) -> Void,
         onCreateWorktree: ((String) -> Void)? = nil,
-        onRemoveWorktree: ((UUID) -> Void)? = nil
+        onRemoveWorktree: ((UUID) -> Void)? = nil,
+        onAddProject: (() -> Void)? = nil,
+        onOpenSettings: (() -> Void)? = nil
     ) {
+        self.projects = projects
+        self.selectedProjectId = selectedProjectId
         self.worktrees = worktrees
         self.windows = windows
         self.selectedWorktreeId = selectedWorktreeId
         self.selectedWindowId = selectedWindowId
+        self.onSelectProject = onSelectProject
         self.onSelectWorktree = onSelectWorktree
         self.onSelectWindow = onSelectWindow
         self.onCreateWorktree = onCreateWorktree
         self.onRemoveWorktree = onRemoveWorktree
+        self.onAddProject = onAddProject
+        self.onOpenSettings = onOpenSettings
     }
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Header with "+" button
-            sidebarHeader
-
             ScrollView(.vertical) {
-                LazyVStack(alignment: .leading, spacing: MoriTokens.Spacing.sm) {
-                    if isCreatingWorktree {
-                        branchNameInput
-                    }
-                    if worktrees.isEmpty && !isCreatingWorktree {
-                        emptyState
-                    } else {
-                        ForEach(worktrees) { worktree in
-                            worktreeSection(worktree)
-                        }
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(projects) { project in
+                        projectSection(project)
                     }
                 }
-                .padding(.vertical, MoriTokens.Spacing.lg)
-                .padding(.horizontal, MoriTokens.Spacing.sm)
+                .padding(.top, MoriTokens.Spacing.lg)
             }
+
+            Spacer(minLength: 0)
+
+            sidebarFooter
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
-    // MARK: - Header
+    // MARK: - Project Section
 
-    private var sidebarHeader: some View {
+    @ViewBuilder
+    private func projectSection(_ project: Project) -> some View {
+        // Section header
         HStack {
-            Text("Worktrees")
+            Text(project.name)
                 .font(MoriTokens.Font.sectionTitle)
                 .foregroundStyle(MoriTokens.Color.muted)
 
             Spacer()
 
-            if onCreateWorktree != nil {
+            if project.id == selectedProjectId, onCreateWorktree != nil {
                 Button(action: {
+                    onSelectProject?(project.id)
                     isCreatingWorktree = true
                     newBranchName = ""
                 }) {
                     Image(systemName: "plus")
-                        .font(MoriTokens.Font.label)
+                        .font(.system(size: 11))
                         .foregroundStyle(MoriTokens.Color.muted)
                 }
                 .buttonStyle(.plain)
-                .help("Create new worktree")
+                .help("Create worktree")
             }
         }
         .padding(.horizontal, MoriTokens.Spacing.xl)
-        .padding(.vertical, MoriTokens.Spacing.md)
+        .padding(.top, MoriTokens.Spacing.xl)
+        .padding(.bottom, MoriTokens.Spacing.sm)
+        .contentShape(Rectangle())
+        .onTapGesture { onSelectProject?(project.id) }
+
+        // Branch input (only for selected project)
+        if project.id == selectedProjectId, isCreatingWorktree {
+            branchNameInput
+                .padding(.horizontal, MoriTokens.Spacing.sm)
+        }
+
+        // Worktrees for this project
+        let projectWorktrees = worktrees.filter { $0.projectId == project.id }
+
+        if projectWorktrees.isEmpty, project.id == selectedProjectId {
+            Text("No worktrees")
+                .font(MoriTokens.Font.caption)
+                .foregroundStyle(MoriTokens.Color.muted)
+                .padding(.horizontal, MoriTokens.Spacing.xl)
+                .padding(.vertical, MoriTokens.Spacing.sm)
+        }
+
+        ForEach(projectWorktrees) { worktree in
+            worktreeRow(worktree)
+        }
+    }
+
+    // MARK: - Worktree Row
+
+    @ViewBuilder
+    private func worktreeRow(_ worktree: Worktree) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            WorktreeRowView(
+                worktree: worktree,
+                isSelected: worktree.id == selectedWorktreeId,
+                onSelect: { onSelectWorktree(worktree.id) }
+            )
+            .contextMenu {
+                if !worktree.isMainWorktree, let onRemove = onRemoveWorktree {
+                    Button(role: .destructive) {
+                        onRemove(worktree.id)
+                    } label: {
+                        Label("Remove Worktree...", systemImage: "trash")
+                    }
+                }
+            }
+
+            // Windows under selected worktree
+            if worktree.id == selectedWorktreeId {
+                let worktreeWindows = windows
+                    .filter { $0.worktreeId == worktree.id }
+                    .sorted { $0.tmuxWindowIndex < $1.tmuxWindowIndex }
+
+                ForEach(worktreeWindows) { window in
+                    WindowRowView(
+                        window: window,
+                        isActive: window.tmuxWindowId == selectedWindowId,
+                        onSelect: { onSelectWindow(window.tmuxWindowId) }
+                    )
+                    .padding(.leading, MoriTokens.Spacing.xxl)
+                }
+            }
+        }
+        .padding(.horizontal, MoriTokens.Spacing.sm)
     }
 
     // MARK: - Branch Name Input
@@ -106,9 +181,7 @@ public struct WorktreeSidebarView: View {
                 .textFieldStyle(.plain)
                 .font(.subheadline)
                 .disabled(isSubmitting)
-                .onSubmit {
-                    submitBranchName()
-                }
+                .onSubmit { submitBranchName() }
 
             Button(action: { submitBranchName() }) {
                 Image(systemName: "checkmark.circle.fill")
@@ -128,7 +201,6 @@ public struct WorktreeSidebarView: View {
         .padding(.vertical, MoriTokens.Spacing.sm)
         .background(MoriTokens.Color.muted.opacity(MoriTokens.Opacity.subtle))
         .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
-        .padding(.horizontal, MoriTokens.Spacing.sm)
     }
 
     private func submitBranchName() {
@@ -146,54 +218,42 @@ public struct WorktreeSidebarView: View {
         newBranchName = ""
     }
 
-    // MARK: - Sections
+    // MARK: - Footer
 
-    @ViewBuilder
-    private func worktreeSection(_ worktree: Worktree) -> some View {
-        VStack(alignment: .leading, spacing: MoriTokens.Spacing.xs) {
-            WorktreeRowView(
-                worktree: worktree,
-                isSelected: worktree.id == selectedWorktreeId,
-                onSelect: { onSelectWorktree(worktree.id) }
-            )
-            .contextMenu {
-                if !worktree.isMainWorktree, let onRemove = onRemoveWorktree {
-                    Button(role: .destructive) {
-                        onRemove(worktree.id)
-                    } label: {
-                        Label("Remove Worktree...", systemImage: "trash")
+    private var sidebarFooter: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            HStack(spacing: MoriTokens.Spacing.lg) {
+                if let onAddProject {
+                    Button(action: onAddProject) {
+                        HStack(spacing: MoriTokens.Spacing.sm) {
+                            Image(systemName: "plus.rectangle.on.folder")
+                                .font(.system(size: 12))
+                            Text("Add Project")
+                                .font(MoriTokens.Font.caption)
+                        }
+                        .foregroundStyle(MoriTokens.Color.muted)
                     }
+                    .buttonStyle(.plain)
+                    .help("Add Project")
+                }
+
+                Spacer()
+
+                if let onOpenSettings {
+                    Button(action: onOpenSettings) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 12))
+                            .foregroundStyle(MoriTokens.Color.muted)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings (⌘,)")
+                    .accessibilityLabel("Settings")
                 }
             }
-
-            let worktreeWindows = windows
-                .filter { $0.worktreeId == worktree.id }
-                .sorted { $0.tmuxWindowIndex < $1.tmuxWindowIndex }
-
-            ForEach(worktreeWindows) { window in
-                WindowRowView(
-                    window: window,
-                    isActive: window.tmuxWindowId == selectedWindowId,
-                    onSelect: { onSelectWindow(window.tmuxWindowId) }
-                )
-                .padding(.leading, MoriTokens.Spacing.xxl)
-            }
+            .padding(.horizontal, MoriTokens.Spacing.xl)
+            .padding(.vertical, MoriTokens.Spacing.lg)
         }
-        .padding(.bottom, MoriTokens.Spacing.sm)
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: MoriTokens.Spacing.lg) {
-            Image(systemName: "folder.badge.plus")
-                .font(.title2)
-                .foregroundStyle(MoriTokens.Color.muted)
-            Text("No worktrees")
-                .font(.subheadline)
-                .foregroundStyle(MoriTokens.Color.muted)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, MoriTokens.Spacing.emptyState)
     }
 }

@@ -76,29 +76,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         self.mainWindowController = windowController
 
         // Build split view children
-        let railController = ProjectRailHostingController(
+        let sidebarController = SidebarHostingController(
             appState: state,
-            onSelect: { [weak manager] projectId in
+            onSelectProject: { [weak manager, weak self] projectId in
                 manager?.selectProject(projectId)
+                self?.updateWindowTitle()
             },
-            onAddProject: { [weak self] in
-                self?.showAddProjectPanel()
-            },
-            onOpenSettings: { [weak self] in
-                self?.showSettingsWindow()
-            },
-            onToggleSidebar: { [weak self] in
-                self?.rootSplitVC?.toggleSidebar()
-            }
-        )
-
-        let sidebarController = WorktreeSidebarHostingController(
-            appState: state,
-            onSelectWorktree: { [weak manager] worktreeId in
+            onSelectWorktree: { [weak manager, weak self] worktreeId in
                 manager?.selectWorktree(worktreeId)
+                self?.updateWindowTitle()
             },
-            onSelectWindow: { [weak manager] windowId in
+            onSelectWindow: { [weak manager, weak self] windowId in
                 manager?.selectWindow(windowId)
+                self?.updateWindowTitle()
             },
             onCreateWorktree: { [weak manager] branchName in
                 guard let manager else { return }
@@ -111,6 +101,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 Task { @MainActor in
                     await manager.removeWorktree(worktreeId: worktreeId)
                 }
+            },
+            onAddProject: { [weak self] in
+                self?.showAddProjectPanel()
+            },
+            onOpenSettings: { [weak self] in
+                self?.showSettingsWindow()
             }
         )
 
@@ -118,11 +114,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         self.terminalAreaController = terminalArea
 
         let splitVC = RootSplitViewController(
-            railController: railController,
             sidebarController: sidebarController,
             contentController: terminalArea
         )
         self.rootSplitVC = splitVC
+
+        windowController.onToggleSidebar = { [weak splitVC] in
+            splitVC?.toggleSidebar()
+        }
 
         windowController.contentViewController = splitVC
         windowController.showWindow(nil)
@@ -492,7 +491,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     // MARK: - Helpers
 
     private func updateWindowTitle() {
-        mainWindowController?.updateTitle(projectName: appState?.selectedProject?.name)
+        mainWindowController?.updateTitle(
+            projectName: appState?.selectedProject?.name,
+            worktreeName: appState?.selectedWorktree?.branch ?? appState?.selectedWorktree?.name
+        )
     }
 
     // MARK: - Settings (Cmd+,)

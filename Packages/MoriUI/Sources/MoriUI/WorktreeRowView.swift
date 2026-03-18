@@ -1,7 +1,7 @@
 import SwiftUI
 import MoriCore
 
-/// A row representing a single worktree, displayed as a section header.
+/// A two-line row representing a single worktree: bold name + subtitle with status.
 public struct WorktreeRowView: View {
     let worktree: Worktree
     let isSelected: Bool
@@ -21,24 +21,28 @@ public struct WorktreeRowView: View {
 
     public var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: MoriTokens.Spacing.md) {
-                Image(systemName: "arrow.triangle.branch")
+            HStack(alignment: .center, spacing: MoriTokens.Spacing.md) {
+                Image(systemName: worktree.isMainWorktree ? "star.fill" : "arrow.triangle.branch")
                     .font(MoriTokens.Font.label)
-                    .foregroundStyle(MoriTokens.Color.muted)
+                    .foregroundStyle(worktree.isMainWorktree ? MoriTokens.Color.attention : MoriTokens.Color.muted)
 
-                Text(worktree.branch ?? worktree.name)
-                    .font(MoriTokens.Font.rowTitle)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: MoriTokens.Spacing.xxs) {
+                    HStack(spacing: MoriTokens.Spacing.sm) {
+                        Text(worktree.branch ?? worktree.name)
+                            .font(.system(.body, weight: .semibold))
+                            .lineLimit(1)
 
-                Spacer()
+                        gitStatusBadges
+                    }
 
-                gitStatusBadges
+                    subtitleText
+                }
+
+                Spacer(minLength: 0)
 
                 alertBadgeView
-
-                statusIndicator
             }
-            .padding(.vertical, MoriTokens.Spacing.sm)
+            .padding(.vertical, MoriTokens.Spacing.md)
             .padding(.horizontal, MoriTokens.Spacing.lg)
             .contentShape(Rectangle())
         }
@@ -58,52 +62,56 @@ public struct WorktreeRowView: View {
         }
     }
 
+    // MARK: - Subtitle
+
+    private var subtitleText: some View {
+        HStack(spacing: MoriTokens.Spacing.sm) {
+            Text(worktree.name)
+                .font(MoriTokens.Font.caption)
+                .foregroundStyle(MoriTokens.Color.muted)
+                .lineLimit(1)
+
+            if worktree.status == .active {
+                Circle()
+                    .fill(MoriTokens.Color.success)
+                    .frame(width: MoriTokens.Icon.dot, height: MoriTokens.Icon.dot)
+                    .accessibilityLabel("Active")
+            }
+        }
+    }
+
     // MARK: - Git Status Badges
 
     @ViewBuilder
     private var gitStatusBadges: some View {
-        HStack(spacing: MoriTokens.Spacing.sm) {
+        HStack(spacing: MoriTokens.Spacing.xs) {
+            if worktree.aheadCount > 0 || worktree.behindCount > 0 {
+                HStack(spacing: MoriTokens.Spacing.xxs) {
+                    if worktree.aheadCount > 0 {
+                        Text("+\(worktree.aheadCount)")
+                            .font(MoriTokens.Font.monoSmall)
+                            .foregroundStyle(MoriTokens.Color.success)
+                            .accessibilityLabel("\(worktree.aheadCount) ahead")
+                    }
+                    if worktree.behindCount > 0 {
+                        Text("-\(worktree.behindCount)")
+                            .font(MoriTokens.Font.monoSmall)
+                            .foregroundStyle(MoriTokens.Color.error)
+                            .accessibilityLabel("\(worktree.behindCount) behind")
+                    }
+                }
+                .padding(.horizontal, MoriTokens.Spacing.sm)
+                .padding(.vertical, MoriTokens.Spacing.xxs)
+                .background(MoriTokens.Color.muted.opacity(MoriTokens.Opacity.subtle))
+                .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
+            }
+
             if worktree.hasUncommittedChanges {
-                Circle()
-                    .fill(MoriTokens.Color.warning)
-                    .frame(width: MoriTokens.Icon.dot, height: MoriTokens.Icon.dot)
+                Image(systemName: "pencil.circle.fill")
+                    .font(.system(size: MoriTokens.Icon.badge))
+                    .foregroundStyle(MoriTokens.Color.warning)
                     .help("Uncommitted changes")
                     .accessibilityLabel("Uncommitted changes")
-            }
-
-            if worktree.aheadCount > 0 {
-                HStack(spacing: MoriTokens.Spacing.xxs) {
-                    Image(systemName: "arrow.up")
-                        .font(MoriTokens.Font.arrowIcon)
-                    Text("\(worktree.aheadCount)")
-                        .font(MoriTokens.Font.monoSmall)
-                }
-                .foregroundStyle(MoriTokens.Color.success)
-                .help("\(worktree.aheadCount) ahead of upstream")
-                .accessibilityLabel("\(worktree.aheadCount) ahead of upstream")
-            }
-
-            if worktree.behindCount > 0 {
-                HStack(spacing: MoriTokens.Spacing.xxs) {
-                    Image(systemName: "arrow.down")
-                        .font(MoriTokens.Font.arrowIcon)
-                    Text("\(worktree.behindCount)")
-                        .font(MoriTokens.Font.monoSmall)
-                }
-                .foregroundStyle(MoriTokens.Color.error)
-                .help("\(worktree.behindCount) behind upstream")
-                .accessibilityLabel("\(worktree.behindCount) behind upstream")
-            }
-
-            if worktree.unreadCount > 0 {
-                Text("\(worktree.unreadCount)")
-                    .font(MoriTokens.Font.badgeCount)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, MoriTokens.Spacing.sm)
-                    .padding(.vertical, MoriTokens.Spacing.xxs)
-                    .background(Capsule().fill(MoriTokens.Color.info))
-                    .help("\(worktree.unreadCount) unread")
-                    .accessibilityLabel("\(worktree.unreadCount) unread")
             }
         }
     }
@@ -139,29 +147,6 @@ public struct WorktreeRowView: View {
                 .accessibilityLabel("Agent completed")
         case .none:
             EmptyView()
-        }
-    }
-
-    // MARK: - Status Indicator
-
-    @ViewBuilder
-    private var statusIndicator: some View {
-        switch worktree.status {
-        case .active:
-            Circle()
-                .fill(MoriTokens.Color.success)
-                .frame(width: MoriTokens.Icon.indicator, height: MoriTokens.Icon.indicator)
-                .accessibilityLabel("Active")
-        case .inactive:
-            Circle()
-                .fill(MoriTokens.Color.inactive)
-                .frame(width: MoriTokens.Icon.indicator, height: MoriTokens.Icon.indicator)
-                .accessibilityLabel("Inactive")
-        case .unavailable:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(MoriTokens.Font.caption)
-                .foregroundStyle(MoriTokens.Color.warning)
-                .accessibilityLabel("Unavailable")
         }
     }
 }
