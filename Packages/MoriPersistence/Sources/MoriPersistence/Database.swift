@@ -30,9 +30,6 @@ public struct AppDatabase: Sendable {
     private static func makeConfiguration() -> Configuration {
         var config = Configuration()
         config.foreignKeysEnabled = true
-        config.prepareDatabase { db in
-            db.trace { print("SQL: \($0)") }
-        }
         return config
     }
 
