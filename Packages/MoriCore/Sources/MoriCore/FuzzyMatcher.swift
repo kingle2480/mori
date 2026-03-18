@@ -26,9 +26,10 @@ public enum FuzzyMatcher {
         }
 
         // Word boundary match — query matches the start of any word
-        let words = splitIntoWords(lowerCandidate)
+        // Split on original candidate (preserves camelCase info), then lowercase words
+        let words = splitIntoWords(candidate)
         for word in words {
-            if word.hasPrefix(lowerQuery) {
+            if word.lowercased().hasPrefix(lowerQuery) {
                 return 75
             }
         }

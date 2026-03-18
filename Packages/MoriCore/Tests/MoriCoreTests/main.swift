@@ -394,6 +394,61 @@ func testMultipleUnreadWindowsCountCorrectly() {
     assertEqual(unreadCount, 2)
 }
 
+// MARK: - FuzzyMatcher Tests
+
+func testFuzzyMatcherExactPrefix() {
+    // Exact prefix should score 100
+    assertEqual(FuzzyMatcher.score(query: "mori", candidate: "mori-project"), 100)
+    assertEqual(FuzzyMatcher.score(query: "Mor", candidate: "Mori"), 100)
+}
+
+func testFuzzyMatcherWordBoundary() {
+    // Query matching start of a word (not first word) scores 75
+    assertEqual(FuzzyMatcher.score(query: "side", candidate: "feat-sidebar"), 75)
+    assertEqual(FuzzyMatcher.score(query: "bar", candidate: "foo_bar_baz"), 75)
+    assertEqual(FuzzyMatcher.score(query: "proj", candidate: "my-project"), 75)
+}
+
+func testFuzzyMatcherSubstring() {
+    // Substring not at word boundary scores 50
+    assertEqual(FuzzyMatcher.score(query: "ject", candidate: "project"), 50)
+    assertEqual(FuzzyMatcher.score(query: "ori", candidate: "mori"), 50)
+}
+
+func testFuzzyMatcherNoMatch() {
+    // No match returns 0
+    assertEqual(FuzzyMatcher.score(query: "xyz", candidate: "mori"), 0)
+    assertEqual(FuzzyMatcher.score(query: "abc", candidate: "def"), 0)
+}
+
+func testFuzzyMatcherEmptyQuery() {
+    // Empty query matches everything with max score
+    assertEqual(FuzzyMatcher.score(query: "", candidate: "anything"), 100)
+    assertEqual(FuzzyMatcher.score(query: "", candidate: ""), 100)
+}
+
+func testFuzzyMatcherCaseInsensitive() {
+    // Case-insensitive throughout
+    assertEqual(FuzzyMatcher.score(query: "MORI", candidate: "mori"), 100)
+    assertEqual(FuzzyMatcher.score(query: "mori", candidate: "MORI"), 100)
+    assertEqual(FuzzyMatcher.score(query: "Side", candidate: "feat-sidebar"), 75)
+}
+
+func testFuzzyMatcherCamelCaseBoundary() {
+    // camelCase word boundaries
+    assertEqual(FuzzyMatcher.score(query: "palette", candidate: "commandPalette"), 75)
+    assertEqual(FuzzyMatcher.score(query: "command", candidate: "commandPalette"), 100)
+}
+
+func testFuzzyMatcherScoreOrdering() {
+    // Verify relative ordering: prefix > word boundary > substring
+    let prefixScore = FuzzyMatcher.score(query: "cre", candidate: "create-worktree")
+    let wordScore = FuzzyMatcher.score(query: "work", candidate: "create-worktree")
+    let subScore = FuzzyMatcher.score(query: "ork", candidate: "create-worktree")
+    assertTrue(prefixScore > wordScore, "prefix should beat word boundary")
+    assertTrue(wordScore > subScore, "word boundary should beat substring")
+}
+
 // MARK: - Main
 
 print("=== MoriCore Model Tests ===")
@@ -435,6 +490,15 @@ testClearedUnreadReturnsToIdle()
 testUnreadDoesNotOverrideHigherPriority()
 testUnreadOverridesDirty()
 testMultipleUnreadWindowsCountCorrectly()
+
+testFuzzyMatcherExactPrefix()
+testFuzzyMatcherWordBoundary()
+testFuzzyMatcherSubstring()
+testFuzzyMatcherNoMatch()
+testFuzzyMatcherEmptyQuery()
+testFuzzyMatcherCaseInsensitive()
+testFuzzyMatcherCamelCaseBoundary()
+testFuzzyMatcherScoreOrdering()
 
 printResults()
 
