@@ -188,11 +188,11 @@ public final class PTYTerminalView: NSView {
             }
         }
 
-        source.setCancelHandler { [weak self] in
-            guard let self else { return }
-            if self.masterFD >= 0 {
-                close(self.masterFD)
-                self.masterFD = -1
+        // Capture FD by value to avoid cross-actor access in cancel handler
+        let fdToClose = masterFD
+        source.setCancelHandler {
+            if fdToClose >= 0 {
+                close(fdToClose)
             }
         }
 
@@ -200,26 +200,31 @@ public final class PTYTerminalView: NSView {
     }
 
     func stop() {
-        readSource?.cancel()
-        readSource = nil
-
-        if masterFD >= 0 {
-            close(masterFD)
-            masterFD = -1
-        }
-
+        // Signal the child process first
         if childPID > 0 {
             kill(childPID, SIGHUP)
             var status: Int32 = 0
             waitpid(childPID, &status, WNOHANG)
             childPID = -1
         }
+
+        // Cancel the dispatch source — its cancel handler is the sole owner of FD closing
+        readSource?.cancel()
+        readSource = nil
     }
 
-    /// Non-isolated cleanup for deinit
+    /// Non-isolated cleanup for deinit.
+    /// Uses nonisolated(unsafe) copies to avoid actor isolation issues.
     private nonisolated func stopNonisolated() {
-        // Minimal cleanup without actor isolation — just signal the child
-        // The dispatch source cancel and fd close happen via the cancel handler
+        // Capture values without actor isolation for deinit safety
+        nonisolated(unsafe) let pid = childPID
+        nonisolated(unsafe) let source = readSource
+
+        if pid > 0 {
+            kill(pid, SIGHUP)
+        }
+        // Cancel source — its cancel handler will close the FD
+        source?.cancel()
     }
 
     // MARK: - Output Handling
