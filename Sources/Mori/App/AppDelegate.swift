@@ -510,19 +510,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
 
-        let settingsView = TerminalSettingsView(
-            settings: Binding(
-                get: { [weak self] in self?.terminalSettings ?? TerminalSettings() },
-                set: { [weak self] newValue in self?.terminalSettings = newValue }
-            ),
-            onChanged: { [weak self] in
+        // Reload from disk so we always show the persisted state
+        self.terminalSettings = TerminalSettings.load()
+
+        // Wrapper view uses @State so SwiftUI properly tracks changes and
+        // re-renders dependent UI (theme preview, etc.) on every edit.
+        let settingsView = SettingsWindowContent(
+            initial: self.terminalSettings,
+            onChanged: { [weak self] newSettings in
                 guard let self else { return }
+                self.terminalSettings = newSettings
                 self.terminalSettings.save()
-                // Apply to SwiftTerm surfaces and force tmux redraw via SIGWINCH nudge
                 self.terminalAreaController?.applySettings(self.terminalSettings)
-                // Sync window background with theme
                 self.mainWindowController?.updateBackground(settings: self.terminalSettings)
-                // Update tmux server-side color options
                 if let tmuxBackend = self.workspaceManager?.tmuxBackend {
                     let settings = self.terminalSettings
                     Task {
@@ -588,5 +588,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+}
+
+// MARK: - Settings Window Wrapper
+
+/// Thin wrapper that gives SwiftUI `@State` ownership of the settings value
+/// so pickers, sliders, and the theme preview all update in sync.
+private struct SettingsWindowContent: View {
+    @State var settings: TerminalSettings
+    var onChanged: (TerminalSettings) -> Void
+
+    init(initial: TerminalSettings, onChanged: @escaping (TerminalSettings) -> Void) {
+        self._settings = State(initialValue: initial)
+        self.onChanged = onChanged
+    }
+
+    var body: some View {
+        TerminalSettingsView(settings: $settings, onChanged: {
+            onChanged(settings)
+        })
     }
 }

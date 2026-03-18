@@ -35,8 +35,11 @@ public struct TerminalSettings: Codable, Equatable, Sendable {
 
     private static let defaultsKey = "terminalSettings"
 
+    /// Stable suite so settings survive swift-run rebuilds (no bundle ID needed).
+    nonisolated(unsafe) private static let defaults = UserDefaults(suiteName: "com.mori.app")!
+
     public static func load() -> TerminalSettings {
-        guard let data = UserDefaults.standard.data(forKey: defaultsKey),
+        guard let data = defaults.data(forKey: defaultsKey),
               let settings = try? JSONDecoder().decode(TerminalSettings.self, from: data)
         else {
             return TerminalSettings()
@@ -46,6 +49,6 @@ public struct TerminalSettings: Codable, Equatable, Sendable {
 
     public func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
-        UserDefaults.standard.set(data, forKey: Self.defaultsKey)
+        Self.defaults.set(data, forKey: Self.defaultsKey)
     }
 }

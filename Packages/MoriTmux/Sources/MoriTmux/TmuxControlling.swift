@@ -51,6 +51,9 @@ public protocol TmuxControlling: Sendable {
     /// Set a tmux session option. If sessionId is nil, sets the global default.
     func setOption(sessionId: String?, option: String, value: String) async throws
 
+    /// Set a tmux window option. If global is true, sets `-gw`. Otherwise targets a session.
+    func setWindowOption(global: Bool, target: String?, option: String, value: String) async throws
+
     /// Force all clients to refresh their display.
     func refreshClients() async throws
 
@@ -100,6 +103,10 @@ public extension TmuxControlling {
 
     func setOption(sessionId: String?, option: String, value: String) async throws {
         throw TmuxError.notYetImplemented("setOption")
+    }
+
+    func setWindowOption(global: Bool, target: String?, option: String, value: String) async throws {
+        throw TmuxError.notYetImplemented("setWindowOption")
     }
 
     func refreshClients() async throws {

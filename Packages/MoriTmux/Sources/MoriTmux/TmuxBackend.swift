@@ -210,6 +210,14 @@ public actor TmuxBackend: TmuxControlling {
         }
     }
 
+    public func setWindowOption(global: Bool, target: String?, option: String, value: String) async throws {
+        if global {
+            _ = try await runner.run("set-option", "-gw", option, value)
+        } else if let target {
+            _ = try await runner.run("set-option", "-w", "-t", target, option, value)
+        }
+    }
+
     public func capturePaneOutput(paneId: String, lineCount: Int) async throws -> String {
         try await runner.run(
             "capture-pane", "-p", "-t", paneId, "-S", "-\(lineCount)"
