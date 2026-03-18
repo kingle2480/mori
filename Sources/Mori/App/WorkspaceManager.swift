@@ -620,10 +620,17 @@ final class WorkspaceManager {
 
     // MARK: - Agent State Detection
 
-    /// Detect agent state for agent-tagged windows and update badges.
-    /// For non-agent windows, derive running/idle from pane currentCommand.
+    /// Detect pane states and propagate to RuntimeWindow fields and badges.
+    /// For agent-tagged windows, captures output for full detection.
+    /// For all windows, aggregates state across all panes.
+    /// Resets worktree agentState at the start of each cycle before re-aggregating.
     private func detectAgentStates(sessions: [TmuxSession]) async {
         let now = Date().timeIntervalSince1970
+
+        // Reset worktree agentState before re-aggregating from windows
+        for i in appState.worktrees.indices {
+            appState.worktrees[i].agentState = .none
+        }
 
         for i in appState.runtimeWindows.indices {
             let rw = appState.runtimeWindows[i]
@@ -634,57 +641,69 @@ final class WorkspaceManager {
                 in: sessions
             ) else { continue }
 
-            // Get the active pane (or first pane as fallback)
-            guard let activePane = tmuxWindow.panes.first(where: { $0.isActive })
-                    ?? tmuxWindow.panes.first else { continue }
+            guard !tmuxWindow.panes.isEmpty else { continue }
 
-            if rw.tag == .agent {
-                // Agent-tagged window: capture output and run full detection
-                do {
-                    let captured = try await tmuxBackend.capturePaneOutput(
-                        paneId: activePane.paneId,
-                        lineCount: 20
-                    )
-                    let paneState = PaneStateDetector.detect(
-                        pane: activePane,
-                        capturedOutput: captured,
-                        now: now
-                    )
+            // Aggregate state across ALL panes in this window
+            var windowIsRunning = false
+            var windowIsLongRunning = false
+            var windowAgentState: AgentState = .none
+            var windowExitCode: Int? = nil
 
-                    // Map DetectedAgentState -> MoriCore AgentState
-                    let agentState = mapAgentState(paneState.detectedAgentState)
+            for pane in tmuxWindow.panes {
+                let isShell = PaneStateDetector.isShellProcess(pane.currentCommand)
+                let paneRunning = !isShell && pane.currentCommand != nil
+                let paneLongRunning = paneRunning
+                    && pane.startTime.map({ now - $0 > PaneStateDetector.longRunningThreshold }) ?? false
 
-                    // Update window badge using richer derivation
-                    let badge = StatusAggregator.windowBadge(
-                        hasUnreadOutput: rw.hasUnreadOutput,
-                        isRunning: paneState.isRunning,
-                        isLongRunning: paneState.isLongRunning,
-                        agentState: agentState
-                    )
-                    appState.runtimeWindows[i].badge = badge
+                if paneRunning { windowIsRunning = true }
+                if paneLongRunning { windowIsLongRunning = true }
 
-                    // Update parent worktree's agentState (highest priority wins)
-                    updateWorktreeAgentState(
-                        worktreeId: rw.worktreeId,
-                        agentState: agentState
-                    )
-                } catch {
-                    // capture-pane failure is non-fatal; keep existing badge
+                // Agent detection only for agent-tagged windows
+                if rw.tag == .agent {
+                    do {
+                        let captured = try await tmuxBackend.capturePaneOutput(
+                            paneId: pane.paneId,
+                            lineCount: 20
+                        )
+                        let paneState = PaneStateDetector.detect(
+                            pane: pane,
+                            capturedOutput: captured,
+                            now: now
+                        )
+                        let agentState = mapAgentState(paneState.detectedAgentState)
+                        if agentStatePriority(agentState) > agentStatePriority(windowAgentState) {
+                            windowAgentState = agentState
+                        }
+                        if let exitCode = paneState.exitCode {
+                            windowExitCode = exitCode
+                        }
+                    } catch {
+                        // capture-pane failure is non-fatal; skip this pane
+                    }
                 }
-            } else {
-                // Non-agent window: derive running/idle from pane command
-                let isShell = PaneStateDetector.isShellProcess(activePane.currentCommand)
-                let isRunning = !isShell && activePane.currentCommand != nil
-                let isLongRunning = isRunning
-                    && activePane.startTime.map({ now - $0 > PaneStateDetector.longRunningThreshold }) ?? false
+            }
 
-                let badge = StatusAggregator.windowBadge(
-                    hasUnreadOutput: rw.hasUnreadOutput,
-                    isRunning: isRunning,
-                    isLongRunning: isLongRunning,
-                    agentState: .none
+            // Update RuntimeWindow fields
+            appState.runtimeWindows[i].isRunning = windowIsRunning
+            appState.runtimeWindows[i].isLongRunning = windowIsLongRunning
+            appState.runtimeWindows[i].agentState = windowAgentState
+            appState.runtimeWindows[i].lastExitCode = windowExitCode
+
+            // Derive badge from aggregated state
+            let badge = StatusAggregator.windowBadge(
+                hasUnreadOutput: rw.hasUnreadOutput,
+                isRunning: windowIsRunning,
+                isLongRunning: windowIsLongRunning,
+                agentState: windowAgentState
+            )
+            appState.runtimeWindows[i].badge = badge
+
+            // Update parent worktree's agentState (highest priority wins)
+            if windowAgentState != .none {
+                updateWorktreeAgentState(
+                    worktreeId: rw.worktreeId,
+                    agentState: windowAgentState
                 )
-                appState.runtimeWindows[i].badge = badge
             }
         }
     }
