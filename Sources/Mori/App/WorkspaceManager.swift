@@ -201,6 +201,7 @@ final class WorkspaceManager {
         // Recompute worktree unread count and project aggregates
         updateUnreadCounts()
         updateAggregatedBadges()
+        updateDockBadge()
     }
 
     // MARK: - Add Project
@@ -578,6 +579,9 @@ final class WorkspaceManager {
 
         // Check for notification-worthy badge transitions
         checkNotifications()
+
+        // Update dock badge with aggregate unread count
+        updateDockBadge()
     }
 
     /// Update runtime windows from tmux session data.
@@ -875,6 +879,14 @@ final class WorkspaceManager {
 
             previousBadges[rw.tmuxWindowId] = newBadge
         }
+    }
+
+    // MARK: - Dock Badge
+
+    /// Update the dock tile badge with aggregate unread count across all projects.
+    func updateDockBadge() {
+        let totalUnread = appState.projects.reduce(0) { $0 + $1.aggregateUnreadCount }
+        NSApp.dockTile.badgeLabel = totalUnread > 0 ? "\(totalUnread)" : nil
     }
 
     // MARK: - Window / Pane Operations
