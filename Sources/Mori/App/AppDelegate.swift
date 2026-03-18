@@ -520,6 +520,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 self.terminalSettings.save()
                 // Apply to SwiftTerm surfaces and force tmux redraw via SIGWINCH nudge
                 self.terminalAreaController?.applySettings(self.terminalSettings)
+                // Sync window background with theme
+                self.mainWindowController?.updateBackground(settings: self.terminalSettings)
                 // Update tmux server-side color options
                 if let tmuxBackend = self.workspaceManager?.tmuxBackend {
                     let settings = self.terminalSettings
