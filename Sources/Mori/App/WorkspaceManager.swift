@@ -517,7 +517,13 @@ final class WorkspaceManager {
     }
 
     /// Update runtime windows from tmux session data.
+    /// Preserves existing `hasUnreadOutput` state across poll cycles.
     private func updateRuntimeState(from sessions: [TmuxSession]) {
+        // Build lookup of existing unread state
+        let previousUnread: [String: Bool] = Dictionary(
+            uniqueKeysWithValues: appState.runtimeWindows.map { ($0.tmuxWindowId, $0.hasUnreadOutput) }
+        )
+
         var runtimeWindows: [RuntimeWindow] = []
 
         for session in sessions where session.isMoriSession {
@@ -526,9 +532,9 @@ final class WorkspaceManager {
             }) else { continue }
 
             for tmuxWindow in session.windows {
-                // Derive badge from unread state (simple for now;
-                // Phase 2.5 will add proper unread tracking via pane_activity)
-                let badge = StatusAggregator.windowBadge(hasUnreadOutput: false)
+                // Preserve unread state from previous poll (Phase 2.5 will set it)
+                let wasUnread = previousUnread[tmuxWindow.windowId] ?? false
+                let badge = StatusAggregator.windowBadge(hasUnreadOutput: wasUnread)
 
                 let rw = RuntimeWindow(
                     tmuxWindowId: tmuxWindow.windowId,
@@ -536,7 +542,7 @@ final class WorkspaceManager {
                     tmuxWindowIndex: tmuxWindow.windowIndex,
                     title: tmuxWindow.name,
                     paneCount: tmuxWindow.panes.count,
-                    hasUnreadOutput: false,
+                    hasUnreadOutput: wasUnread,
                     badge: badge
                 )
                 runtimeWindows.append(rw)
