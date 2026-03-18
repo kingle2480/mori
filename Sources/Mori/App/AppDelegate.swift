@@ -113,9 +113,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Persist UI state before exit
+        workspaceManager?.saveUIStateOnTerminate()
+
         // Clean up terminal surfaces
         terminalAreaController?.removeAllSurfaces()
-        // TODO: Phase 5 — Persist UI state before exit
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {

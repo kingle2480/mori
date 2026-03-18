@@ -195,4 +195,9 @@ final class WorkspaceManager {
     private func saveUIState() {
         try? uiStateRepo.save(appState.uiState)
     }
+
+    /// Save UI state synchronously — called from applicationWillTerminate.
+    func saveUIStateOnTerminate() {
+        try? uiStateRepo.save(appState.uiState)
+    }
 }
