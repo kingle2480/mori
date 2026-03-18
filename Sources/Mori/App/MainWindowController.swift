@@ -26,7 +26,9 @@ final class MainWindowController: NSWindowController {
         window.title = "Mori"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(hex: TerminalSettings.load().theme.background)
+        let settings = TerminalSettings.load()
+        window.backgroundColor = NSColor(hex: settings.theme.background)
+        window.appearance = NSAppearance(named: settings.theme.isDark ? .darkAqua : .aqua)
         window.setFrameAutosaveName("MoriMainWindow")
         if !window.setFrameUsingName("MoriMainWindow") {
             window.center()
@@ -46,6 +48,7 @@ final class MainWindowController: NSWindowController {
 
     func updateBackground(settings: TerminalSettings) {
         window?.backgroundColor = NSColor(hex: settings.theme.background)
+        window?.appearance = NSAppearance(named: settings.theme.isDark ? .darkAqua : .aqua)
     }
 
     func updateTitle(projectName: String?, worktreeName: String? = nil) {

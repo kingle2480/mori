@@ -9,6 +9,8 @@ import MoriUI
 @MainActor
 final class SidebarHostingController: NSHostingController<SidebarContentView> {
 
+    private let appState: AppState
+
     init(
         appState: AppState,
         onSelectProject: @escaping (UUID) -> Void,
@@ -19,6 +21,7 @@ final class SidebarHostingController: NSHostingController<SidebarContentView> {
         onAddProject: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil
     ) {
+        self.appState = appState
         let rootView = SidebarContentView(
             appState: appState,
             onSelectProject: onSelectProject,
@@ -35,6 +38,11 @@ final class SidebarHostingController: NSHostingController<SidebarContentView> {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Sync the hosting controller's view appearance with the terminal theme.
+    func updateAppearance(settings: TerminalSettings) {
+        view.appearance = NSAppearance(named: settings.theme.isDark ? .darkAqua : .aqua)
     }
 }
 
@@ -57,6 +65,7 @@ struct SidebarContentView: View {
             windows: appState.runtimeWindows,
             selectedWorktreeId: appState.uiState.selectedWorktreeId,
             selectedWindowId: appState.uiState.selectedWindowId,
+            theme: appState.terminalSettings.theme,
             onSelectProject: onSelectProject,
             onSelectWorktree: onSelectWorktree,
             onSelectWindow: onSelectWindow,

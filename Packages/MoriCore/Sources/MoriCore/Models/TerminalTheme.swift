@@ -32,6 +32,18 @@ public struct TerminalTheme: Codable, Equatable, Sendable, Identifiable {
         self.selection = selection
         self.ansi = ansi
     }
+
+    /// Whether this theme has a dark background (luminance < 0.5).
+    public var isDark: Bool {
+        let hex = background.hasPrefix("#") ? String(background.dropFirst()) : background
+        guard hex.count == 6, let rgb = UInt32(hex, radix: 16) else { return true }
+        let r = Double((rgb >> 16) & 0xFF) / 255.0
+        let g = Double((rgb >> 8) & 0xFF) / 255.0
+        let b = Double(rgb & 0xFF) / 255.0
+        // Relative luminance (ITU-R BT.709)
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return luminance < 0.5
+    }
 }
 
 // MARK: - Built-in Themes

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Centralized design tokens for consistent styling across MoriUI views.
 public enum MoriTokens {
@@ -103,4 +104,19 @@ public enum MoriTokens {
         /// 0.2 — medium highlight (e.g., unselected avatar circle)
         public static let medium: Double = 0.2
     }
+}
+
+// MARK: - Hex Color Helper (package-internal)
+
+/// Converts a hex color string to NSColor. Used by sidebar and settings views.
+func nsColor(hex: String) -> NSColor {
+    let h = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+    let scanner = Scanner(string: h)
+    var rgb: UInt64 = 0
+    scanner.scanHexInt64(&rgb)
+
+    let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
+    let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
+    let b = CGFloat(rgb & 0xFF) / 255.0
+    return NSColor(srgbRed: r, green: g, blue: b, alpha: 1.0)
 }

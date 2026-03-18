@@ -159,15 +159,4 @@ public struct TerminalSettingsView: View {
     }
 }
 
-// Local hex-to-NSColor helper (avoids cross-module extension conflicts)
-private func nsColor(hex: String) -> NSColor {
-    let h = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
-    let scanner = Scanner(string: h)
-    var rgb: UInt64 = 0
-    scanner.scanHexInt64(&rgb)
-
-    let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-    let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-    let b = CGFloat(rgb & 0xFF) / 255.0
-    return NSColor(srgbRed: r, green: g, blue: b, alpha: 1.0)
-}
+// nsColor(hex:) is defined in DesignTokens.swift (package-internal)

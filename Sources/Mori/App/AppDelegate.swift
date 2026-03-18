@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var rootSplitVC: RootSplitViewController?
     private var keyMonitor: Any?
     private var settingsWindowController: NSWindowController?
+    private var sidebarController: SidebarHostingController?
     private var terminalSettings = TerminalSettings.load()
     private var ipcServer: IPCServer?
     private var ipcHandler: IPCHandler?
@@ -109,6 +110,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 self?.showSettingsWindow()
             }
         )
+
+        self.sidebarController = sidebarController
+        sidebarController.updateAppearance(settings: self.terminalSettings)
 
         let terminalArea = TerminalAreaViewController()
         self.terminalAreaController = terminalArea
@@ -521,8 +525,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 guard let self else { return }
                 self.terminalSettings = newSettings
                 self.terminalSettings.save()
+                self.appState?.terminalSettings = newSettings
                 self.terminalAreaController?.applySettings(self.terminalSettings)
                 self.mainWindowController?.updateBackground(settings: self.terminalSettings)
+                self.sidebarController?.updateAppearance(settings: self.terminalSettings)
                 if let tmuxBackend = self.workspaceManager?.tmuxBackend {
                     let settings = self.terminalSettings
                     Task {
