@@ -76,3 +76,31 @@ Implemented agent state detection (tasks 2.1-2.7) across 7 commits. The coordina
 - Prompt suffix matching checks both raw line (with trailing space) and trimmed version (tmux may strip trailing whitespace)
 - `Worktree.agentState` is updated with highest-priority agent state across its agent-tagged windows
 - Phase 3 (Worktree Status Enhancements) should add `isRunning`, `isLongRunning`, `lastExitCode`, per-window `agentState` fields to `RuntimeWindow` and propagate from all panes, not just the active one
+
+## Phase 3: Worktree Status Enhancements — COMPLETE
+
+### Summary
+Implemented worktree status enhancements (tasks 3.1-3.4) across 4 commits. RuntimeWindow now carries per-window runtime state fields, pane states are aggregated across all panes per window, sidebar views show distinct badge icons, and worktree agentState is properly reset each poll cycle.
+
+### What was done
+1. **RuntimeWindow enhanced fields** (`Packages/MoriCore/Sources/MoriCore/Models/RuntimeWindow.swift`) — Added `lastExitCode: Int?`, `isRunning: Bool`, `isLongRunning: Bool`, `agentState: AgentState` with sensible defaults. Fully Codable.
+2. **Pane state propagation** (`Sources/Mori/App/WorkspaceManager.swift`) — `detectAgentStates` now iterates ALL panes per window (not just active), aggregating running/longRunning/agentState/exitCode. Worktree `agentState` is reset to `.none` at the start of each poll cycle before re-aggregating (fixes Phase 2 review finding). Agent-tagged windows still get full `capture-pane` detection; non-agent windows derive state from command metadata.
+3. **Richer sidebar badges** — WindowRowView uses distinct SF Symbol icons: error (xmark.circle.fill, red), waiting (exclamationmark.bubble.fill, yellow), longRunning (clock.fill, orange), running (bolt.fill, green), unread (blue dot), idle (hidden). WorktreeRowView shows aggregated agent state badge.
+4. **Tests** — 33 new assertions (230 total MoriCore, 447 across all packages). Covers enhanced field defaults/init/Codable, all windowBadge input combinations, worktree aggregation with running/error/longRunning badges, AlertState mapping for longRunning, interaction with git dirty status.
+
+### Files changed
+- `Packages/MoriCore/Sources/MoriCore/Models/RuntimeWindow.swift`
+- `Packages/MoriCore/Tests/MoriCoreTests/main.swift`
+- `Packages/MoriUI/Sources/MoriUI/WindowRowView.swift`
+- `Packages/MoriUI/Sources/MoriUI/WorktreeRowView.swift`
+- `Sources/Mori/App/WorkspaceManager.swift`
+
+### Build status
+- Zero warnings under Swift 6 strict concurrency
+- All 447 test assertions passing (230 core + 175 tmux + 42 persistence)
+
+### Notes for next phase
+- RuntimeWindow now has per-window `agentState` — Phase 4 (Notifications) can use `NotificationDebouncer` to detect badge transitions on `RuntimeWindow.badge`
+- Worktree `agentState` resets each poll cycle and re-aggregates — no stale state accumulation
+- Sidebar badge icons are SF Symbols — consistent with macOS design language
+- `lastExitCode` is best-effort (only populated for agent-tagged windows via output pattern matching)

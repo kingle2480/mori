@@ -18,10 +18,10 @@
 - [x] 2.7 — Tests for PaneStateDetector, DetectedAgentState, command filtering
 
 ## Phase 3: Worktree Status Enhancements
-- [ ] 3.1 — Add `lastExitCode`, `isRunning`, `isLongRunning`, `agentState` to RuntimeWindow
-- [ ] 3.2 — Propagate pane state to RuntimeWindow during poll
-- [ ] 3.3 — Update sidebar views with badge-specific icons and colors
-- [ ] 3.4 — Tests for enhanced status aggregation
+- [x] 3.1 — Add `lastExitCode`, `isRunning`, `isLongRunning`, `agentState` to RuntimeWindow
+- [x] 3.2 — Propagate pane state to RuntimeWindow during poll
+- [x] 3.3 — Update sidebar views with badge-specific icons and colors
+- [x] 3.4 — Tests for enhanced status aggregation
 
 ## Phase 4: Notifications
 - [ ] 4.1 — Create `NotificationDebouncer` in MoriCore (pure transition + debounce logic)
