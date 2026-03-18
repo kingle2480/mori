@@ -21,6 +21,7 @@ enum TmuxThemeApplicator {
 
         // Session-level options (set-option -g)
         let sessionOptions: [(String, String)] = [
+            ("status", "off"),
             ("status-style", "fg=\(fg),bg=\(statusBg)"),
             ("message-style", "fg=\(fg),bg=\(statusBg)"),
         ]

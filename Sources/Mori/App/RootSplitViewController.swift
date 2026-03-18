@@ -33,7 +33,7 @@ final class RootSplitViewController: NSSplitViewController {
         sidebarItem.canCollapse = true
         sidebarItem.holdingPriority = .defaultHigh
 
-        let contentItem = NSSplitViewItem(contentListWithViewController: contentController)
+        let contentItem = NSSplitViewItem(viewController: contentController)
         contentItem.minimumThickness = 400
 
         addSplitViewItem(sidebarItem)
@@ -64,7 +64,7 @@ final class RootSplitViewController: NSSplitViewController {
         removeSplitViewItem(splitViewItems[index])
 
         contentController = controller
-        let newItem = NSSplitViewItem(contentListWithViewController: controller)
+        let newItem = NSSplitViewItem(viewController: controller)
         newItem.minimumThickness = 400
         insertSplitViewItem(newItem, at: index)
     }
