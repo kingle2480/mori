@@ -15,7 +15,7 @@ public struct NotificationDebouncer: Sendable {
     public static let debounceInterval: TimeInterval = 30
 
     /// Last fire time per (windowId, event) pair.
-    private var lastFired: [String: Date] = []
+    private var lastFired: [String: Date] = [:]
 
     public init() {}
 
