@@ -220,12 +220,24 @@ final class WorkspaceManager {
     /// If git fails, no DB write occurs.
     @discardableResult
     func createWorktree(projectId: UUID, branchName: String) async throws -> Worktree {
+        // Validate inputs
+        let trimmed = branchName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            throw WorkspaceError.branchNameEmpty
+        }
+
+        // Reject branch names with spaces or characters git doesn't allow
+        let invalidChars = CharacterSet(charactersIn: " ~^:?*[\\")
+        if trimmed.unicodeScalars.contains(where: { invalidChars.contains($0) }) {
+            throw WorkspaceError.branchNameInvalid(trimmed)
+        }
+
         guard let project = appState.projects.first(where: { $0.id == projectId }) else {
             throw WorkspaceError.projectNotFound
         }
 
         let projectSlug = SessionNaming.slugify(project.name)
-        let branchSlug = SessionNaming.slugify(branchName)
+        let branchSlug = SessionNaming.slugify(trimmed)
 
         // Compute worktree path: ~/.mori/{project-slug}/{branch-slug}
         let moriDir = (NSHomeDirectory() as NSString).appendingPathComponent(".mori")
@@ -242,17 +254,17 @@ final class WorkspaceManager {
         try await gitBackend.addWorktree(
             repoPath: project.repoRootPath,
             path: worktreePath,
-            branch: branchName,
+            branch: trimmed,
             createBranch: true
         )
 
         // Step 2: Create Worktree model and save to DB
-        let sessionName = SessionNaming.sessionName(project: project.name, worktree: branchName)
+        let sessionName = SessionNaming.sessionName(project: project.name, worktree: trimmed)
         let worktree = Worktree(
             projectId: projectId,
-            name: branchName,
+            name: trimmed,
             path: worktreePath,
-            branch: branchName,
+            branch: trimmed,
             isMainWorktree: false,
             tmuxSessionName: sessionName,
             status: .active
