@@ -9,13 +9,13 @@
 - [x] 1.6 — Tests for WindowTag, RuntimeWindow tag, tag inference, WindowBadge.longRunning
 
 ## Phase 2: Agent State Detection
-- [ ] 2.1 — Add `pane_current_command` and `pane_start_time` to TmuxParser/TmuxPane
-- [ ] 2.2 — Create `DetectedAgentState` enum and `PaneState` model in MoriTmux
-- [ ] 2.3 — Create `PaneStateDetector` with pattern matching
-- [ ] 2.4 — Add `capturePaneOutput` to TmuxBackend/TmuxControlling
-- [ ] 2.5 — Integrate detection into coordinated poll (agent-tagged windows only)
-- [ ] 2.6 — Update StatusAggregator with richer badge derivation
-- [ ] 2.7 — Tests for PaneStateDetector, DetectedAgentState, command filtering
+- [x] 2.1 — Add `pane_current_command` and `pane_start_time` to TmuxParser/TmuxPane
+- [x] 2.2 — Create `DetectedAgentState` enum and `PaneState` model in MoriTmux
+- [x] 2.3 — Create `PaneStateDetector` with pattern matching
+- [x] 2.4 — Add `capturePaneOutput` to TmuxBackend/TmuxControlling
+- [x] 2.5 — Integrate detection into coordinated poll (agent-tagged windows only)
+- [x] 2.6 — Update StatusAggregator with richer badge derivation
+- [x] 2.7 — Tests for PaneStateDetector, DetectedAgentState, command filtering
 
 ## Phase 3: Worktree Status Enhancements
 - [ ] 3.1 — Add `lastExitCode`, `isRunning`, `isLongRunning`, `agentState` to RuntimeWindow
