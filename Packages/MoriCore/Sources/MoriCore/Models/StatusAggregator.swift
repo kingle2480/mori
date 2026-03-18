@@ -67,4 +67,27 @@ public enum StatusAggregator {
     public static func windowBadge(hasUnreadOutput: Bool) -> WindowBadge {
         hasUnreadOutput ? .unread : .idle
     }
+
+    /// Derive a window badge from richer pane-level state.
+    /// Priority: error > waiting > longRunning > running > unread > idle.
+    public static func windowBadge(
+        hasUnreadOutput: Bool,
+        isRunning: Bool,
+        isLongRunning: Bool,
+        agentState: AgentState
+    ) -> WindowBadge {
+        // Agent state takes highest priority when it indicates attention needed
+        switch agentState {
+        case .error:
+            return .error
+        case .waitingForInput:
+            return .waiting
+        default:
+            break
+        }
+        if isLongRunning { return .longRunning }
+        if isRunning { return .running }
+        if hasUnreadOutput { return .unread }
+        return .idle
+    }
 }
