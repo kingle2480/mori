@@ -67,8 +67,11 @@ final class TerminalAreaViewController: NSViewController {
             oldSurface.removeFromSuperview()
         }
 
-        // Get or create surface from cache
-        let command = "tmux attach-session -t \(shellEscape(sessionName)) || tmux new-session -s \(shellEscape(sessionName))"
+        // Get or create surface from cache.
+        // Use `has-session` to check first, avoiding tmux parsing the session
+        // name as session:window when it contains special characters.
+        let escaped = shellEscape(sessionName)
+        let command = "tmux has-session -t \(escaped) 2>/dev/null && tmux attach-session -t \(escaped) || tmux new-session -s \(escaped)"
         let surface = surfaceCache.surface(
             forSession: sessionName,
             command: command,
