@@ -38,6 +38,7 @@ final class WorkspaceManager {
     let gitStatusCoordinator: GitStatusCoordinator
     let unreadTracker: UnreadTracker
     let notificationManager: NotificationManager
+    let hookRunner: HookRunner
 
     /// Callback invoked when the terminal should switch to a different session.
     /// Parameters: (sessionName, workingDirectory)
@@ -76,6 +77,7 @@ final class WorkspaceManager {
         self.gitStatusCoordinator = GitStatusCoordinator(gitBackend: gitBackend)
         self.unreadTracker = UnreadTracker()
         self.notificationManager = NotificationManager()
+        self.hookRunner = HookRunner(tmuxBackend: tmuxBackend)
     }
 
     /// Whether tmux is available on this system.
@@ -160,6 +162,9 @@ final class WorkspaceManager {
             }
         }
 
+        // Fire onWorktreeFocus hook
+        fireHook(event: .onWorktreeFocus, worktreeId: worktreeId)
+
         saveUIState()
     }
 
@@ -180,6 +185,9 @@ final class WorkspaceManager {
 
             // Clear unread state for this window
             clearUnread(windowId: windowId, worktreeId: worktree.id)
+
+            // Fire onWindowFocus hook
+            fireHook(event: .onWindowFocus, worktreeId: worktree.id, windowName: window.title)
         }
 
         saveUIState()
@@ -332,6 +340,9 @@ final class WorkspaceManager {
         appState.worktrees.append(worktree)
         selectWorktree(worktree.id)
 
+        // Fire onWorktreeCreate hook
+        fireHook(event: .onWorktreeCreate, worktreeId: worktree.id)
+
         return worktree
     }
 
@@ -399,10 +410,14 @@ final class WorkspaceManager {
 
         switch response {
         case .alertFirstButtonReturn:
+            // Fire onWorktreeClose hook before cleanup
+            fireHook(event: .onWorktreeClose, worktreeId: worktree.id)
             // Soft delete — mark unavailable
             softDeleteWorktree(at: index)
 
         case .alertSecondButtonReturn:
+            // Fire onWorktreeClose hook before cleanup
+            fireHook(event: .onWorktreeClose, worktreeId: worktree.id)
             // Hard delete — git worktree remove + soft delete
             softDeleteWorktree(at: index)
             if let project = appState.projects.first(where: { $0.id == worktree.projectId }) {
@@ -902,6 +917,9 @@ final class WorkspaceManager {
             await refreshRuntimeState()
             // Re-attach terminal to the (possibly recreated) session
             onTerminalSwitch?(sessionName, worktree.path)
+
+            // Fire onWindowCreate hook
+            fireHook(event: .onWindowCreate, worktreeId: worktree.id)
         } catch {
             showErrorAlert(title: "Failed to create window", message: error.localizedDescription)
         }
@@ -947,6 +965,11 @@ final class WorkspaceManager {
         // Don't close the last window — that would kill the session
         let windowsInSession = appState.runtimeWindows.filter { $0.worktreeId == worktree.id }
         if windowsInSession.count <= 1 { return }
+
+        // Fire onWindowClose hook before kill
+        let windowTitle = appState.runtimeWindows
+            .first(where: { $0.tmuxWindowId == windowId })?.title ?? ""
+        fireHook(event: .onWindowClose, worktreeId: worktree.id, windowName: windowTitle)
 
         do {
             try await tmuxBackend.killWindow(sessionId: sessionName, windowId: windowId)
@@ -1044,5 +1067,32 @@ final class WorkspaceManager {
                 }
             }
         }
+    }
+
+    // MARK: - Hook Helpers
+
+    /// Build a HookContext from the current state for a given worktree.
+    private func buildHookContext(
+        worktree: Worktree,
+        project: Project,
+        windowName: String = ""
+    ) -> HookContext {
+        HookContext(
+            projectName: project.name,
+            worktreeName: worktree.name,
+            sessionName: worktree.tmuxSessionName ?? "",
+            windowName: windowName,
+            cwd: worktree.path
+        )
+    }
+
+    /// Fire a hook event for the given worktree if a matching project is found.
+    private func fireHook(event: HookEvent, worktreeId: UUID, windowName: String = "") {
+        guard let worktree = appState.worktrees.first(where: { $0.id == worktreeId }),
+              let project = appState.projects.first(where: { $0.id == worktree.projectId }) else {
+            return
+        }
+        let context = buildHookContext(worktree: worktree, project: project, windowName: windowName)
+        hookRunner.fire(event: event, context: context, projectRootPath: project.repoRootPath)
     }
 }
