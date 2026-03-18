@@ -305,6 +305,95 @@ func testAlertStateNewCasesCodable() {
     }
 }
 
+// MARK: - Unread Flow Tests
+
+/// Tests verifying unread badge flow from window-level to worktree and project aggregation.
+/// The actual UnreadTracker (app target) sets hasUnreadOutput on RuntimeWindow;
+/// these tests verify StatusAggregator correctly derives badges and aggregates.
+
+func testUnreadWindowProducesBlueBadge() {
+    // A window with unread output should get .unread badge
+    let badge = StatusAggregator.windowBadge(hasUnreadOutput: true)
+    assertEqual(badge, .unread)
+
+    // A window without unread output should get .idle badge
+    let idleBadge = StatusAggregator.windowBadge(hasUnreadOutput: false)
+    assertEqual(idleBadge, .idle)
+}
+
+func testUnreadRollupToWorktree() {
+    // Worktree with one unread window → .unread alert state
+    let state = StatusAggregator.worktreeAlertState(
+        windowBadges: [.idle, .unread, .idle],
+        hasUncommittedChanges: false
+    )
+    assertEqual(state, .unread)
+}
+
+func testUnreadRollupToProject() {
+    // Project with worktrees having unread counts → sum
+    let totalUnread = StatusAggregator.projectUnreadCount(worktreeUnreadCounts: [2, 0, 3])
+    assertEqual(totalUnread, 5)
+
+    // Project alert state from worktrees with unread
+    let projectState = StatusAggregator.projectAlertState(worktreeStates: [.none, .unread])
+    assertEqual(projectState, .unread)
+}
+
+func testClearedUnreadReturnsToIdle() {
+    // When unread is cleared (hasUnreadOutput = false), badge goes back to idle
+    let badge = StatusAggregator.windowBadge(hasUnreadOutput: false)
+    assertEqual(badge, .idle)
+
+    // Worktree with all idle windows → .none alert state
+    let state = StatusAggregator.worktreeAlertState(
+        windowBadges: [.idle, .idle],
+        hasUncommittedChanges: false
+    )
+    assertEqual(state, .none)
+
+    // Project with zero unread
+    let count = StatusAggregator.projectUnreadCount(worktreeUnreadCounts: [0, 0])
+    assertEqual(count, 0)
+}
+
+func testUnreadDoesNotOverrideHigherPriority() {
+    // Error > unread: worktree with both error and unread → error wins
+    let state = StatusAggregator.worktreeAlertState(
+        windowBadges: [.unread, .error],
+        hasUncommittedChanges: false
+    )
+    assertEqual(state, .error)
+
+    // Waiting > unread
+    let waitingState = StatusAggregator.worktreeAlertState(
+        windowBadges: [.unread, .waiting],
+        hasUncommittedChanges: false
+    )
+    assertEqual(waitingState, .waiting)
+}
+
+func testUnreadOverridesDirty() {
+    // Unread > dirty: worktree with unread windows + dirty git → unread wins
+    let state = StatusAggregator.worktreeAlertState(
+        windowBadges: [.unread],
+        hasUncommittedChanges: true
+    )
+    assertEqual(state, .unread)
+}
+
+func testMultipleUnreadWindowsCountCorrectly() {
+    // Multiple unread windows should each contribute to unreadCount
+    // (Simulating what updateUnreadCounts does)
+    let windows = [
+        RuntimeWindow(tmuxWindowId: "@1", worktreeId: UUID(), hasUnreadOutput: true),
+        RuntimeWindow(tmuxWindowId: "@2", worktreeId: UUID(), hasUnreadOutput: false),
+        RuntimeWindow(tmuxWindowId: "@3", worktreeId: UUID(), hasUnreadOutput: true),
+    ]
+    let unreadCount = windows.filter { $0.hasUnreadOutput }.count
+    assertEqual(unreadCount, 2)
+}
+
 // MARK: - Main
 
 print("=== MoriCore Model Tests ===")
@@ -338,6 +427,14 @@ testProjectAlertStateAggregation()
 testProjectUnreadCount()
 testAlertStateComparable()
 testAlertStateNewCasesCodable()
+
+testUnreadWindowProducesBlueBadge()
+testUnreadRollupToWorktree()
+testUnreadRollupToProject()
+testClearedUnreadReturnsToIdle()
+testUnreadDoesNotOverrideHigherPriority()
+testUnreadOverridesDirty()
+testMultipleUnreadWindowsCountCorrectly()
 
 printResults()
 
