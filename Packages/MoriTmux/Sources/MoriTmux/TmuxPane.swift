@@ -8,18 +8,22 @@ public struct TmuxPane: Identifiable, Equatable, Sendable {
     public let isActive: Bool
     public let currentPath: String?
     public let title: String?
+    /// Unix timestamp (seconds since epoch) of last pane activity, from `#{pane_activity}`.
+    public let lastActivity: TimeInterval?
 
     public init(
         paneId: String,
         tty: String? = nil,
         isActive: Bool = false,
         currentPath: String? = nil,
-        title: String? = nil
+        title: String? = nil,
+        lastActivity: TimeInterval? = nil
     ) {
         self.paneId = paneId
         self.tty = tty
         self.isActive = isActive
         self.currentPath = currentPath
         self.title = title
+        self.lastActivity = lastActivity
     }
 }
