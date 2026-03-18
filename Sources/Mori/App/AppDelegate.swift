@@ -103,11 +103,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     await manager.removeWorktree(worktreeId: worktreeId)
                 }
             },
+            onToggleCollapse: { [weak manager] projectId in
+                manager?.toggleProjectCollapse(projectId)
+            },
             onAddProject: { [weak self] in
                 self?.showAddProjectPanel()
             },
             onOpenSettings: { [weak self] in
                 self?.showSettingsWindow()
+            },
+            onOpenCommandPalette: { [weak self] in
+                self?.commandPaletteController?.toggle()
             }
         )
 
@@ -410,12 +416,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self.handlePaletteSelection(item, manager: manager)
         }
 
-        // Register Cmd+K local key monitor
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak palette] event in
-            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "k" {
+        // Register Cmd+K and Cmd+1–9 local key monitor
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak palette, weak self] event in
+            guard event.modifierFlags.contains(.command) else { return event }
+            let key = event.charactersIgnoringModifiers ?? ""
+
+            if key == "k" {
                 palette?.toggle()
-                return nil  // Consume the event
+                return nil
             }
+
+            // Cmd+1 through Cmd+9: select visible worktree by index
+            if let digit = Int(key), digit >= 1, digit <= 9 {
+                self?.selectWorktreeByShortcut(index: digit)
+                return nil
+            }
+
             return event
         }
     }
@@ -493,6 +509,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     // MARK: - Helpers
+
+    /// Select the Nth visible worktree (1-indexed) across all non-collapsed projects.
+    private func selectWorktreeByShortcut(index: Int) {
+        guard let appState, let manager = workspaceManager else { return }
+        var count = 0
+        for project in appState.projects where !project.isCollapsed {
+            let projectWorktrees = appState.worktrees.filter { $0.projectId == project.id }
+            for worktree in projectWorktrees {
+                count += 1
+                if count == index {
+                    manager.selectWorktree(worktree.id)
+                    updateWindowTitle()
+                    return
+                }
+            }
+        }
+    }
 
     private func updateWindowTitle() {
         mainWindowController?.updateTitle(

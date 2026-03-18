@@ -18,8 +18,10 @@ final class SidebarHostingController: NSHostingController<SidebarContentView> {
         onSelectWindow: @escaping (String) -> Void,
         onCreateWorktree: ((String) -> Void)? = nil,
         onRemoveWorktree: ((UUID) -> Void)? = nil,
+        onToggleCollapse: ((UUID) -> Void)? = nil,
         onAddProject: (() -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onOpenCommandPalette: (() -> Void)? = nil
     ) {
         self.appState = appState
         let rootView = SidebarContentView(
@@ -29,8 +31,10 @@ final class SidebarHostingController: NSHostingController<SidebarContentView> {
             onSelectWindow: onSelectWindow,
             onCreateWorktree: onCreateWorktree,
             onRemoveWorktree: onRemoveWorktree,
+            onToggleCollapse: onToggleCollapse,
             onAddProject: onAddProject,
-            onOpenSettings: onOpenSettings
+            onOpenSettings: onOpenSettings,
+            onOpenCommandPalette: onOpenCommandPalette
         )
         super.init(rootView: rootView)
     }
@@ -54,8 +58,10 @@ struct SidebarContentView: View {
     let onSelectWindow: (String) -> Void
     let onCreateWorktree: ((String) -> Void)?
     let onRemoveWorktree: ((UUID) -> Void)?
+    let onToggleCollapse: ((UUID) -> Void)?
     let onAddProject: (() -> Void)?
     let onOpenSettings: (() -> Void)?
+    let onOpenCommandPalette: (() -> Void)?
 
     var body: some View {
         WorktreeSidebarView(
@@ -71,8 +77,10 @@ struct SidebarContentView: View {
             onSelectWindow: onSelectWindow,
             onCreateWorktree: onCreateWorktree,
             onRemoveWorktree: onRemoveWorktree,
+            onToggleCollapse: onToggleCollapse,
             onAddProject: onAddProject,
-            onOpenSettings: onOpenSettings
+            onOpenSettings: onOpenSettings,
+            onOpenCommandPalette: onOpenCommandPalette
         )
     }
 }

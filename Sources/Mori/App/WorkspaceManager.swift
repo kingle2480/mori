@@ -143,6 +143,13 @@ final class WorkspaceManager {
         saveUIState()
     }
 
+    // MARK: - Toggle Project Collapse
+
+    func toggleProjectCollapse(_ projectId: UUID) {
+        guard let index = appState.projects.firstIndex(where: { $0.id == projectId }) else { return }
+        appState.projects[index].isCollapsed.toggle()
+    }
+
     // MARK: - Select Worktree
 
     func selectWorktree(_ worktreeId: UUID) {

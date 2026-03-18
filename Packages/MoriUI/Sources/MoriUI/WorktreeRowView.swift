@@ -5,6 +5,7 @@ import MoriCore
 public struct WorktreeRowView: View {
     let worktree: Worktree
     let isSelected: Bool
+    let shortcutIndex: Int?
     let onSelect: () -> Void
 
     @State private var isHovered = false
@@ -12,10 +13,12 @@ public struct WorktreeRowView: View {
     public init(
         worktree: Worktree,
         isSelected: Bool,
+        shortcutIndex: Int? = nil,
         onSelect: @escaping () -> Void
     ) {
         self.worktree = worktree
         self.isSelected = isSelected
+        self.shortcutIndex = shortcutIndex
         self.onSelect = onSelect
     }
 
@@ -41,6 +44,13 @@ public struct WorktreeRowView: View {
                 Spacer(minLength: 0)
 
                 alertBadgeView
+
+                if let shortcutIndex {
+                    Text("\u{2318}\(shortcutIndex)")
+                        .font(MoriTokens.Font.monoSmall)
+                        .foregroundStyle(MoriTokens.Color.muted)
+                        .accessibilityLabel("Command \(shortcutIndex)")
+                }
             }
             .padding(.vertical, MoriTokens.Spacing.md)
             .padding(.horizontal, MoriTokens.Spacing.lg)
