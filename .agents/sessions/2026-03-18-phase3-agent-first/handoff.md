@@ -135,3 +135,44 @@ Implemented macOS notifications for badge state transitions (tasks 4.1-4.6) acro
 - `UNUserNotificationCenterDelegate` is set in `applicationDidFinishLaunching` before any notifications fire
 - Dock badge clears automatically when all unread counts reach zero
 - The `willPresent` delegate method allows banners to display even when the app is in the foreground
+
+## Phase 5: CLI / IPC Interface -- COMPLETE
+
+### Summary
+Implemented the CLI/IPC interface (tasks 5.1-5.8) across 6 commits. The Mori app now exposes a Unix domain socket for automation, and a `ws` CLI executable communicates with the running app.
+
+### What was done
+1. **MoriIPC package** (`Packages/MoriIPC/`) -- New SPM package with no dependencies on other Mori packages. Contains shared protocol types, server, and client.
+2. **IPC protocol** (`Packages/MoriIPC/Sources/MoriIPC/IPCProtocol.swift`) -- `IPCCommand` enum (6 variants: projectList, worktreeCreate, focus, send, newWindow, open). `IPCRequest`/`IPCResponse`/`IPCResponseEnvelope` wire format. `IPCFraming` utilities for newline-delimited JSON encoding/decoding/splitting.
+3. **IPCServer** (`Packages/MoriIPC/Sources/MoriIPC/IPCServer.swift`) -- Actor-based server using `NWListener` with Unix domain socket at `~/Library/Application Support/Mori/mori.sock`. Accepts connections, reads newline-delimited JSON, dispatches to async handler callback. Cleans up socket file on stop.
+4. **IPCClient** (`Packages/MoriIPC/Sources/MoriIPC/IPCClient.swift`) -- `NWConnection`-based client with async `send()` and synchronous `sendSync()` APIs. Uses `ContinuationBox` for thread-safe one-shot resumption and `ResultBox` for semaphore bridge. 5s timeout.
+5. **`ws` CLI** (`Sources/WS/WS.swift`) -- Executable target using swift-argument-parser. Subcommands: `ws project list`, `ws worktree create`, `ws focus`, `ws send`, `ws new-window`, `ws open`. Each maps args to `IPCRequest`, sends via `IPCClient`, prints JSON result.
+6. **App integration** -- IPCServer starts in `applicationDidFinishLaunching`, stops in `applicationWillTerminate`. `IPCHandler` dispatches requests to `@MainActor WorkspaceManager` methods.
+7. **IPC command wiring** (`Sources/Mori/App/IPCHandler.swift`) -- All 6 commands wired: projectList returns JSON array, worktreeCreate finds project and calls createWorktree, focus selects project+worktree, send finds session/window and sends keys, newWindow creates window in session, open adds project from path. Case-insensitive name matching throughout.
+8. **Tests** -- 39 new assertions. Round-trip encoding/decoding for all command variants, request/response/envelope. Framing: split single/multiple/incomplete/empty messages.
+
+### Files changed
+- `Packages/MoriIPC/Package.swift` (new)
+- `Packages/MoriIPC/Sources/MoriIPC/IPCProtocol.swift` (new)
+- `Packages/MoriIPC/Sources/MoriIPC/IPCServer.swift` (new)
+- `Packages/MoriIPC/Sources/MoriIPC/IPCClient.swift` (new)
+- `Packages/MoriIPC/Tests/MoriIPCTests/Assert.swift` (new)
+- `Packages/MoriIPC/Tests/MoriIPCTests/main.swift` (new)
+- `Package.swift` (added MoriIPC dep, swift-argument-parser dep, WS target)
+- `Sources/WS/WS.swift` (new)
+- `Sources/Mori/App/IPCHandler.swift` (new)
+- `Sources/Mori/App/AppDelegate.swift` (IPC server start/stop)
+- `mise.toml` (added test:ipc task)
+
+### Build status
+- Zero warnings under Swift 6 strict concurrency
+- All 508 test assertions passing (252 core + 175 tmux + 42 persistence + 39 IPC)
+
+### Notes for next phase
+- IPCServer socket path is `~/Library/Application Support/Mori/mori.sock` (same dir as SQLite DB)
+- `IPCHandler` uses case-insensitive name matching for projects and worktrees
+- `IPCClient.sendSync()` uses a semaphore+ResultBox pattern safe under Swift 6 strict concurrency
+- The `ws` CLI uses `@main` attribute with `ParsableCommand` -- no separate `main.swift` needed
+- `IPCResponseEnvelope` wraps `IPCResponse` + `requestId` for wire format; the `IPCResponse` enum itself doesn't carry the ID
+- `send` command sends keys to a window by name; it uses the window's tmux ID as the pane target (works for single-pane windows; multi-pane targeting may need enhancement later)
+- Network.framework `NWListener` with Unix domain socket requires the endpoint to be set via `parameters.requiredLocalEndpoint`

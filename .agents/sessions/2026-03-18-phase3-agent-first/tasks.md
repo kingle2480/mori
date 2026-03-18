@@ -32,14 +32,14 @@
 - [x] 4.6 — Tests for NotificationDebouncer
 
 ## Phase 5: CLI / IPC Interface
-- [ ] 5.1 — Create MoriIPC SPM package
-- [ ] 5.2 — Define IPC protocol (IPCCommand, IPCRequest, IPCResponse)
-- [ ] 5.3 — Create IPCServer with Network.framework (NWListener, Unix socket)
-- [ ] 5.4 — Create IPCClient (NWConnection, Unix socket)
-- [ ] 5.5 — Create `ws` CLI executable with swift-argument-parser
-- [ ] 5.6 — Embed IPCServer in app (start/stop in AppDelegate)
-- [ ] 5.7 — Wire all IPC commands in IPCHandler
-- [ ] 5.8 — Tests for IPC protocol serialization
+- [x] 5.1 — Create MoriIPC SPM package
+- [x] 5.2 — Define IPC protocol (IPCCommand, IPCRequest, IPCResponse)
+- [x] 5.3 — Create IPCServer with Network.framework (NWListener, Unix socket)
+- [x] 5.4 — Create IPCClient (NWConnection, Unix socket)
+- [x] 5.5 — Create `ws` CLI executable with swift-argument-parser
+- [x] 5.6 — Embed IPCServer in app (start/stop in AppDelegate)
+- [x] 5.7 — Wire all IPC commands in IPCHandler
+- [x] 5.8 — Tests for IPC protocol serialization
 
 ## Phase 6: Automation Hooks
 - [ ] 6.1 — Define `HookEvent`, `HookAction`, `HookConfig` in MoriCore
