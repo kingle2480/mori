@@ -1,0 +1,75 @@
+min_version = "2025.10.0"
+
+[tools]
+jq = "latest"
+ripgrep = "latest"
+fd = "latest"
+xcbeautify = "latest"
+tmux = "latest"
+
+[env]
+PROJECT_NAME = "Mori"
+DERIVED_DATA = "{{cwd}}/.derived-data"
+
+# ─── Core ────────────────────────────────────────────────────────
+
+[tasks.dev]
+description = "Build and run Mori"
+depends = ["build"]
+run = '''
+swift run Mori
+'''
+
+[tasks.build]
+description = "Debug build"
+run = "swift build 2>&1 | xcbeautify"
+
+[tasks."build:release"]
+description = "Release build"
+run = "swift build -c release 2>&1 | xcbeautify"
+
+[tasks.test]
+description = "Run all tests"
+depends = ["test:core", "test:persistence", "test:tmux"]
+
+[tasks."test:core"]
+run = "cd Packages/MoriCore && swift run MoriCoreTests"
+
+[tasks."test:persistence"]
+run = "cd Packages/MoriPersistence && swift run MoriPersistenceTests"
+
+[tasks."test:tmux"]
+run = "cd Packages/MoriTmux && swift run MoriTmuxTests"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "swift package clean && rm -rf .build .derived-data"
+
+# ─── Xcode ───────────────────────────────────────────────────────
+
+[tasks."xcode:build"]
+description = "Build via xcodebuild"
+run = '''
+set -euo pipefail
+xcodebuild \
+  -project "${PROJECT_NAME}.xcodeproj" \
+  -scheme "$PROJECT_NAME" \
+  -configuration Debug \
+  -derivedDataPath "$DERIVED_DATA" \
+  build 2>&1 | xcbeautify
+'''
+
+[tasks."xcode:test"]
+description = "Run Xcode tests"
+run = '''
+set -euo pipefail
+xcodebuild \
+  -project "${PROJECT_NAME}.xcodeproj" \
+  -scheme "$PROJECT_NAME" \
+  -derivedDataPath "$DERIVED_DATA" \
+  test 2>&1 | xcbeautify
+'''
+
+[tasks."xcode:generate"]
+description = "Generate .xcodeproj from Package.swift"
+run = "swift package generate-xcodeproj"
