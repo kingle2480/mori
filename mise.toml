@@ -30,7 +30,7 @@ run = "swift build -c release 2>&1 | xcbeautify"
 
 [tasks.test]
 description = "Run all tests"
-depends = ["test:core", "test:persistence", "test:tmux"]
+depends = ["test:core", "test:persistence", "test:tmux", "test:ipc"]
 
 [tasks."test:core"]
 run = "cd Packages/MoriCore && swift run MoriCoreTests"
@@ -40,6 +40,9 @@ run = "cd Packages/MoriPersistence && swift run MoriPersistenceTests"
 
 [tasks."test:tmux"]
 run = "cd Packages/MoriTmux && swift run MoriTmuxTests"
+
+[tasks."test:ipc"]
+run = "cd Packages/MoriIPC && swift run MoriIPCTests"
 
 [tasks.clean]
 description = "Clean build artifacts"
