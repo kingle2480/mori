@@ -17,6 +17,8 @@ public final class SwiftTermAdapter: TerminalHost {
 
     public init(settings: TerminalSettings = .load()) {
         self.settings = settings
+        TerminalScrollFix.install()
+        TerminalPasteFix.install()
     }
 
     public func createSurface(command: String, workingDirectory: String) -> NSView {
@@ -139,6 +141,174 @@ public final class SwiftTermAdapter: TerminalHost {
         env["LANG"] = "en_US.UTF-8"
         env["HOME"] = env["HOME"] ?? NSHomeDirectory()
         return env.map { "\($0.key)=\($0.value)" }
+    }
+}
+
+// MARK: - Terminal Scroll Fix
+
+/// Installs a local event monitor that intercepts scroll-wheel events
+/// targeting a `LocalProcessTerminalView` and forwards them to the PTY
+/// as mouse button 4/5 escape sequences when tmux mouse mode is active.
+///
+/// SwiftTerm's built-in `scrollWheel` always scrolls the internal buffer
+/// but never sends mouse escape sequences, so tmux `mouse on` scrolling
+/// doesn't work without this.
+@MainActor
+enum TerminalScrollFix {
+    private static var monitor: Any?
+
+    static func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            guard event.deltaY != 0,
+                  let terminalView = findTerminalView(for: event)
+            else {
+                return event
+            }
+
+            let terminal = terminalView.getTerminal()
+            let mode = terminal.mouseMode
+
+            // Only intercept when mouse mode is active (mirrors sendButtonPress logic).
+            guard mode == .vt200 || mode == .buttonEventTracking || mode == .anyEvent else {
+                return event
+            }
+
+            // Compute grid position from font metrics (cellDimension is internal).
+            let f = terminalView.font
+            let cellWidth = max(f.maximumAdvancement.width, 1)
+            let cellHeight = max(f.ascender - f.descender + f.leading, 1)
+
+            let point = terminalView.convert(event.locationInWindow, from: nil)
+            let col = min(max(0, Int(point.x / cellWidth)), terminal.cols - 1)
+            let row = min(max(0, Int((terminalView.frame.height - point.y) / cellHeight)), terminal.rows - 1)
+
+            let flags = event.modifierFlags
+            let button = event.deltaY > 0 ? 4 : 5
+            let lines = max(1, Int(abs(event.deltaY)))
+            let pixelX = Int(point.x)
+            let pixelY = Int(terminalView.frame.height - point.y)
+
+            for _ in 0..<lines {
+                let buttonFlags = terminal.encodeButton(
+                    button: button,
+                    release: false,
+                    shift: flags.contains(.shift),
+                    meta: flags.contains(.option),
+                    control: flags.contains(.control)
+                )
+                terminal.sendEvent(
+                    buttonFlags: buttonFlags,
+                    x: col,
+                    y: row,
+                    pixelX: pixelX,
+                    pixelY: pixelY
+                )
+            }
+
+            // Consume the event so SwiftTerm doesn't also buffer-scroll.
+            return nil
+        }
+    }
+
+    private static func findTerminalView(for event: NSEvent) -> LocalProcessTerminalView? {
+        guard let window = event.window else { return nil }
+        let point = event.locationInWindow
+        guard let hitView = window.contentView?.hitTest(point) else { return nil }
+        // Walk up the view hierarchy to find the terminal view
+        var view: NSView? = hitView
+        while let v = view {
+            if let tv = v as? LocalProcessTerminalView { return tv }
+            view = v.superview
+        }
+        return nil
+    }
+}
+
+// MARK: - Terminal Paste Fix
+
+/// Intercepts Cmd+V paste events and sends large text in chunks with
+/// small delays between them. SwiftTerm's `LocalProcess.send()` writes
+/// the entire paste in one `DispatchIO.write()` call — if the PTY buffer
+/// fills up (~4KB), excess data is silently dropped.
+@MainActor
+enum TerminalPasteFix {
+    /// Chunk size in bytes. PTY buffers are typically 4KB; use 1KB chunks
+    /// to leave headroom for bracketed paste sequences and tmux overhead.
+    private static let chunkSize = 1024
+
+    /// Delay between chunks in seconds. Just enough for the PTY to drain.
+    private static let chunkDelay: TimeInterval = 0.01
+
+    // Local copies to avoid concurrency warnings on SwiftTerm's mutable statics.
+    private static let bracketedPasteStart: [UInt8] = [0x1b, 0x5b, 0x32, 0x30, 0x30, 0x7e]
+    private static let bracketedPasteEnd: [UInt8] = [0x1b, 0x5b, 0x32, 0x30, 0x31, 0x7e]
+
+    private static var monitor: Any?
+
+    static func install() {
+        guard monitor == nil else { return }
+
+        // Monitor Cmd+V keyDown events
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers == .command,
+                  event.charactersIgnoringModifiers == "v",
+                  let text = NSPasteboard.general.string(forType: .string),
+                  text.utf8.count > chunkSize,
+                  let terminalView = findFirstResponderTerminalView(for: event)
+            else {
+                return event
+            }
+
+            // We have a large paste targeting a terminal view — handle it ourselves.
+            chunkedPaste(text: text, into: terminalView)
+
+            // Consume the event so SwiftTerm doesn't also paste.
+            return nil
+        }
+    }
+
+    private static func chunkedPaste(text: String, into terminalView: LocalProcessTerminalView) {
+        let terminal = terminalView.getTerminal()
+
+        // Send bracketed paste start if the terminal requested it.
+        if terminal.bracketedPasteMode {
+            terminalView.send(data: bracketedPasteStart[0...])
+        }
+
+        let bytes = Array(text.utf8)
+        var offset = 0
+
+        func sendNextChunk() {
+            let end = min(offset + chunkSize, bytes.count)
+            terminalView.send(data: bytes[offset..<end][...])
+            offset = end
+
+            if offset < bytes.count {
+                DispatchQueue.main.asyncAfter(deadline: .now() + chunkDelay) {
+                    MainActor.assumeIsolated {
+                        sendNextChunk()
+                    }
+                }
+            } else if terminal.bracketedPasteMode {
+                terminalView.send(data: bracketedPasteEnd[0...])
+            }
+        }
+
+        sendNextChunk()
+    }
+
+    private static func findFirstResponderTerminalView(for event: NSEvent) -> LocalProcessTerminalView? {
+        guard let window = event.window,
+              let responder = window.firstResponder as? NSView
+        else { return nil }
+        var view: NSView? = responder
+        while let v = view {
+            if let tv = v as? LocalProcessTerminalView { return tv }
+            view = v.superview
+        }
+        return nil
     }
 }
 
