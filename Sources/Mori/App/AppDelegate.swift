@@ -6,9 +6,10 @@ import MoriTerminal
 import MoriTmux
 import MoriUI
 import SwiftUI
+import UserNotifications
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
 
     private var mainWindowController: MainWindowController?
     private var workspaceManager: WorkspaceManager?
@@ -23,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Task 3.8: Single instance check
         enforceSingleInstance()
+
+        // Set self as notification center delegate for click handling
+        UNUserNotificationCenter.current().delegate = self
 
         // Initialize core dependencies
         let state = AppState()
@@ -515,5 +519,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             existing.activate()
             NSApp.terminate(nil)
         }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        let windowId = userInfo["windowId"] as? String
+
+        Task { @MainActor in
+            // Bring app to front
+            NSApp.activate(ignoringOtherApps: true)
+
+            // Focus the relevant window if ID is available
+            if let windowId {
+                self.workspaceManager?.selectWindow(windowId)
+            }
+        }
+
+        completionHandler()
+    }
+
+    /// Allow notifications to show even when the app is in foreground.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
     }
 }
