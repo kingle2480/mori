@@ -6,10 +6,13 @@ public struct WindowTemplate: Sendable, Equatable {
     public let name: String
     /// Command to run in the window after creation. Nil means just open a shell.
     public let command: String?
+    /// Semantic tag for this window.
+    public let tag: WindowTag?
 
-    public init(name: String, command: String? = nil) {
+    public init(name: String, command: String? = nil, tag: WindowTag? = nil) {
         self.name = name
         self.command = command
+        self.tag = tag
     }
 }
 

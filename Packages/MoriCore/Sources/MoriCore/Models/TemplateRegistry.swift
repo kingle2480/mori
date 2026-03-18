@@ -7,9 +7,9 @@ public enum TemplateRegistry {
     public static let basic = SessionTemplate(
         name: "basic",
         windows: [
-            WindowTemplate(name: "shell"),
-            WindowTemplate(name: "run"),
-            WindowTemplate(name: "logs"),
+            WindowTemplate(name: "shell", tag: .shell),
+            WindowTemplate(name: "run", tag: .shell),
+            WindowTemplate(name: "logs", tag: .logs),
         ]
     )
 
@@ -17,10 +17,10 @@ public enum TemplateRegistry {
     public static let go = SessionTemplate(
         name: "go",
         windows: [
-            WindowTemplate(name: "editor"),
-            WindowTemplate(name: "server", command: "go run ."),
-            WindowTemplate(name: "tests", command: "go test ./..."),
-            WindowTemplate(name: "logs"),
+            WindowTemplate(name: "editor", tag: .editor),
+            WindowTemplate(name: "server", command: "go run .", tag: .server),
+            WindowTemplate(name: "tests", command: "go test ./...", tag: .tests),
+            WindowTemplate(name: "logs", tag: .logs),
         ]
     )
 
@@ -28,10 +28,10 @@ public enum TemplateRegistry {
     public static let agent = SessionTemplate(
         name: "agent",
         windows: [
-            WindowTemplate(name: "editor"),
-            WindowTemplate(name: "agent"),
-            WindowTemplate(name: "server"),
-            WindowTemplate(name: "logs"),
+            WindowTemplate(name: "editor", tag: .editor),
+            WindowTemplate(name: "agent", tag: .agent),
+            WindowTemplate(name: "server", tag: .server),
+            WindowTemplate(name: "logs", tag: .logs),
         ]
     )
 
