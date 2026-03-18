@@ -102,6 +102,7 @@ func testParsePanesSingle() {
     assertTrue(panes[0].isActive)
     assertEqual(panes[0].currentPath, "/Users/test/project")
     assertEqual(panes[0].title, "zsh")
+    assertNil(panes[0].lastActivity, "No activity field in 5-field format")
 }
 
 func testParsePanesMultiple() {
@@ -135,6 +136,39 @@ func testParsePanesEmptyOptionals() {
 func testParsePanesEmpty() {
     let panes = TmuxParser.parsePanes("")
     assertEqual(panes.count, 0)
+}
+
+func testParsePanesWithActivity() {
+    let output = "%0\t/dev/ttys001\t1\t/Users/test\tzsh\t1710784200\n"
+    let panes = TmuxParser.parsePanes(output)
+    assertEqual(panes.count, 1)
+    assertEqual(panes[0].paneId, "%0")
+    assertEqual(panes[0].lastActivity, 1710784200.0)
+}
+
+func testParsePanesMultipleWithActivity() {
+    let output = """
+    %0\t/dev/ttys001\t1\t/Users/test\tzsh\t1710784200
+    %1\t/dev/ttys002\t0\t/Users/test/src\tvim\t1710784195
+    """
+    let panes = TmuxParser.parsePanes(output)
+    assertEqual(panes.count, 2)
+    assertEqual(panes[0].lastActivity, 1710784200.0)
+    assertEqual(panes[1].lastActivity, 1710784195.0)
+}
+
+func testParsePanesActivityEmptyField() {
+    let output = "%0\t/dev/ttys001\t1\t/Users/test\tzsh\t\n"
+    let panes = TmuxParser.parsePanes(output)
+    assertEqual(panes.count, 1)
+    assertNil(panes[0].lastActivity, "Empty activity field should be nil")
+}
+
+func testPaneFormatContainsActivity() {
+    assertTrue(
+        TmuxParser.paneFormat.contains("#{pane_activity}"),
+        "Pane format should include pane_activity"
+    )
 }
 
 // MARK: - SessionNaming Tests
@@ -245,6 +279,10 @@ testParsePanesSingle()
 testParsePanesMultiple()
 testParsePanesEmptyOptionals()
 testParsePanesEmpty()
+testParsePanesWithActivity()
+testParsePanesMultipleWithActivity()
+testParsePanesActivityEmptyField()
+testPaneFormatContainsActivity()
 
 // SessionNaming
 testSlugifySimple()
