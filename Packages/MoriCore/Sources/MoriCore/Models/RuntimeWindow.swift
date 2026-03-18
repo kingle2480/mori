@@ -14,6 +14,10 @@ public struct RuntimeWindow: Identifiable, Codable, Equatable, Sendable {
     public var lastOutputAt: Date?
     public var badge: WindowBadge?
     public var tag: WindowTag?
+    public var lastExitCode: Int?
+    public var isRunning: Bool
+    public var isLongRunning: Bool
+    public var agentState: AgentState
 
     public init(
         tmuxWindowId: String,
@@ -27,7 +31,11 @@ public struct RuntimeWindow: Identifiable, Codable, Equatable, Sendable {
         hasUnreadOutput: Bool = false,
         lastOutputAt: Date? = nil,
         badge: WindowBadge? = nil,
-        tag: WindowTag? = nil
+        tag: WindowTag? = nil,
+        lastExitCode: Int? = nil,
+        isRunning: Bool = false,
+        isLongRunning: Bool = false,
+        agentState: AgentState = .none
     ) {
         self.tmuxWindowId = tmuxWindowId
         self.worktreeId = worktreeId
@@ -41,5 +49,9 @@ public struct RuntimeWindow: Identifiable, Codable, Equatable, Sendable {
         self.lastOutputAt = lastOutputAt
         self.badge = badge
         self.tag = tag
+        self.lastExitCode = lastExitCode
+        self.isRunning = isRunning
+        self.isLongRunning = isLongRunning
+        self.agentState = agentState
     }
 }
