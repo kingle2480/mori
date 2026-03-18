@@ -101,8 +101,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Update window title from current project
         updateWindowTitle()
 
-        // Start tmux polling
+        // Check tmux availability and start polling
         Task {
+            let tmuxAvailable = await manager.checkTmuxAvailability()
+            if !tmuxAvailable {
+                showTmuxMissingAlert()
+                return
+            }
+
             await tmuxBackend.setOnChange { [weak manager] _ in
                 Task { @MainActor in
                     await manager?.refreshRuntimeState()
@@ -161,6 +167,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
+    }
+
+    // MARK: - Tmux Missing Alert (Task 5.3)
+
+    private func showTmuxMissingAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "tmux not found"
+        alert.informativeText = """
+            Mori requires tmux to manage terminal sessions. \
+            Please install tmux and relaunch the app.
+
+            Install via Homebrew:
+              brew install tmux
+
+            Or via MacPorts:
+              sudo port install tmux
+            """
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - Helpers

@@ -33,9 +33,14 @@ final class WorkspaceManager {
         self.tmuxBackend = tmuxBackend
     }
 
+    /// Whether tmux is available on this system.
+    /// Set during loadAll() and used by AppDelegate to show alerts.
+    private(set) var isTmuxAvailable: Bool = true
+
     // MARK: - Load All State
 
     /// Load all projects and worktrees from the database into AppState.
+    /// Also validates project paths and marks unavailable ones.
     func loadAll() throws {
         appState.projects = try projectRepo.fetchAll()
         var allWorktrees: [Worktree] = []
@@ -45,6 +50,34 @@ final class WorkspaceManager {
         }
         appState.worktrees = allWorktrees
         appState.uiState = try uiStateRepo.fetch()
+
+        // Validate project paths — mark unavailable if path no longer exists
+        validateProjectPaths()
+    }
+
+    /// Check each worktree path and mark as unavailable if the directory is gone.
+    private func validateProjectPaths() {
+        let fm = FileManager.default
+        for i in appState.worktrees.indices {
+            var isDir: ObjCBool = false
+            let exists = fm.fileExists(atPath: appState.worktrees[i].path, isDirectory: &isDir)
+            if !exists || !isDir.boolValue {
+                appState.worktrees[i].status = .unavailable
+                // Persist the status change
+                try? worktreeRepo.save(appState.worktrees[i])
+            } else if appState.worktrees[i].status == .unavailable {
+                // Path is back — restore to active
+                appState.worktrees[i].status = .active
+                try? worktreeRepo.save(appState.worktrees[i])
+            }
+        }
+    }
+
+    /// Check tmux availability. Returns true if tmux is found.
+    func checkTmuxAvailability() async -> Bool {
+        let available = await tmuxBackend.isAvailable()
+        isTmuxAvailable = available
+        return available
     }
 
     // MARK: - Select Project
