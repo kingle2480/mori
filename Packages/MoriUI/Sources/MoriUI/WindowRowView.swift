@@ -7,6 +7,8 @@ public struct WindowRowView: View {
     let isActive: Bool
     let onSelect: () -> Void
 
+    @State private var isHovered = false
+
     public init(
         window: RuntimeWindow,
         isActive: Bool,
@@ -19,32 +21,45 @@ public struct WindowRowView: View {
 
     public var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 6) {
+            HStack(spacing: MoriTokens.Spacing.md) {
                 Image(systemName: window.tag?.symbolName ?? "terminal")
-                    .font(.caption)
-                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                    .font(MoriTokens.Font.label)
+                    .foregroundStyle(isActive ? MoriTokens.Color.active : MoriTokens.Color.muted)
 
                 Text(window.title.isEmpty ? "Window \(window.tmuxWindowIndex)" : window.title)
-                    .font(.body)
+                    .font(MoriTokens.Font.windowTitle)
                     .lineLimit(1)
+                    .foregroundStyle(isActive ? Color.primary : MoriTokens.Color.muted)
 
                 Spacer()
 
                 windowBadgeView
 
                 if isActive {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 6))
-                        .foregroundStyle(Color.accentColor)
+                    Circle()
+                        .fill(MoriTokens.Color.active)
+                        .frame(width: MoriTokens.Icon.indicator, height: MoriTokens.Icon.indicator)
+                        .accessibilityLabel("Active window")
                 }
             }
-            .padding(.vertical, 2)
-            .padding(.horizontal, 8)
+            .padding(.vertical, MoriTokens.Spacing.xs)
+            .padding(.horizontal, MoriTokens.Spacing.lg)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(isActive ? Color.accentColor.opacity(0.08) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
+        .onHover { isHovered = $0 }
+    }
+
+    private var rowBackground: some ShapeStyle {
+        if isActive {
+            return AnyShapeStyle(MoriTokens.Color.active.opacity(MoriTokens.Opacity.subtle))
+        } else if isHovered {
+            return AnyShapeStyle(MoriTokens.Color.muted.opacity(MoriTokens.Opacity.subtle))
+        } else {
+            return AnyShapeStyle(Color.clear)
+        }
     }
 
     @ViewBuilder
@@ -53,29 +68,34 @@ public struct WindowRowView: View {
             switch badge {
             case .error:
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
+                    .font(.system(size: MoriTokens.Icon.badge))
+                    .foregroundStyle(MoriTokens.Color.error)
                     .help("Error")
+                    .accessibilityLabel("Error")
             case .waiting:
                 Image(systemName: "exclamationmark.bubble.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.yellow)
+                    .font(.system(size: MoriTokens.Icon.badge))
+                    .foregroundStyle(MoriTokens.Color.attention)
                     .help("Waiting for input")
+                    .accessibilityLabel("Waiting for input")
             case .longRunning:
                 Image(systemName: "clock.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.orange)
+                    .font(.system(size: MoriTokens.Icon.badge))
+                    .foregroundStyle(MoriTokens.Color.warning)
                     .help("Long running")
+                    .accessibilityLabel("Long running")
             case .running:
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.green)
+                    .font(.system(size: MoriTokens.Icon.badge))
+                    .foregroundStyle(MoriTokens.Color.success)
                     .help("Running")
+                    .accessibilityLabel("Running")
             case .unread:
                 Circle()
-                    .fill(Color.blue)
-                    .frame(width: 6, height: 6)
+                    .fill(MoriTokens.Color.info)
+                    .frame(width: MoriTokens.Icon.dot, height: MoriTokens.Icon.dot)
                     .help("Unread output")
+                    .accessibilityLabel("Unread output")
             case .idle:
                 EmptyView()
             }

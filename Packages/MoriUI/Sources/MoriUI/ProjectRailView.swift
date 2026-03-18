@@ -19,7 +19,7 @@ public struct ProjectRailView: View {
 
     public var body: some View {
         ScrollView(.vertical) {
-            LazyVStack(spacing: 8) {
+            LazyVStack(spacing: MoriTokens.Spacing.lg) {
                 ForEach(projects) { project in
                     ProjectRailRow(
                         project: project,
@@ -28,7 +28,7 @@ public struct ProjectRailView: View {
                     )
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, MoriTokens.Spacing.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
@@ -44,25 +44,25 @@ private struct ProjectRailRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            VStack(spacing: 4) {
+            VStack(spacing: MoriTokens.Spacing.sm) {
                 ZStack {
                     Circle()
-                        .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.2))
-                        .frame(width: 36, height: 36)
+                        .fill(isSelected ? MoriTokens.Color.active : MoriTokens.Color.muted.opacity(MoriTokens.Opacity.medium))
+                        .frame(width: MoriTokens.Size.avatar, height: MoriTokens.Size.avatar)
 
                     Text(firstLetter)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: MoriTokens.Size.avatarFont, weight: .semibold, design: .rounded))
                         .foregroundStyle(isSelected ? Color.white : Color.primary)
                 }
 
                 Text(project.name)
-                    .font(.caption2)
+                    .font(MoriTokens.Font.caption)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isSelected ? MoriTokens.Color.active : MoriTokens.Color.muted)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, MoriTokens.Spacing.sm)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

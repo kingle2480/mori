@@ -39,7 +39,7 @@ public struct TerminalSettingsView: View {
         Picker("Family", selection: $settings.fontFamily) {
             ForEach(monospacedFontFamilies, id: \.self) { family in
                 Text(family)
-                    .font(.custom(family, size: 13))
+                    .font(.custom(family, size: MoriTokens.Size.fontPreview))
                     .tag(family)
             }
         }
@@ -64,7 +64,7 @@ public struct TerminalSettingsView: View {
     private var themePicker: some View {
         Picker("Color Scheme", selection: $settings.themeName) {
             ForEach(TerminalTheme.builtIn) { theme in
-                HStack(spacing: 6) {
+                HStack(spacing: MoriTokens.Spacing.md) {
                     themeSwatches(theme)
                     Text(theme.name)
                 }
@@ -81,28 +81,28 @@ public struct TerminalSettingsView: View {
             ForEach(0..<16, id: \.self) { i in
                 Rectangle()
                     .fill(Color(nsColor: nsColor(hex: theme.ansi[i])))
-                    .frame(height: 20)
+                    .frame(height: MoriTokens.Size.previewBar)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
         .overlay(
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: MoriTokens.Radius.small)
                 .strokeBorder(.quaternary, lineWidth: 1)
         )
     }
 
     @ViewBuilder
     private func themeSwatches(_ theme: TerminalTheme) -> some View {
-        HStack(spacing: 2) {
+        HStack(spacing: MoriTokens.Spacing.xs) {
             Circle()
                 .fill(Color(nsColor: nsColor(hex: theme.background)))
-                .frame(width: 10, height: 10)
+                .frame(width: MoriTokens.Size.swatch, height: MoriTokens.Size.swatch)
             Circle()
                 .fill(Color(nsColor: nsColor(hex: theme.foreground)))
-                .frame(width: 10, height: 10)
+                .frame(width: MoriTokens.Size.swatch, height: MoriTokens.Size.swatch)
             Circle()
                 .fill(Color(nsColor: nsColor(hex: theme.ansi[4])))  // blue
-                .frame(width: 10, height: 10)
+                .frame(width: MoriTokens.Size.swatch, height: MoriTokens.Size.swatch)
         }
     }
 

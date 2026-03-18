@@ -41,7 +41,7 @@ public struct WorktreeSidebarView: View {
             sidebarHeader
 
             ScrollView(.vertical) {
-                LazyVStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: MoriTokens.Spacing.sm) {
                     if isCreatingWorktree {
                         branchNameInput
                     }
@@ -53,8 +53,8 @@ public struct WorktreeSidebarView: View {
                         }
                     }
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 4)
+                .padding(.vertical, MoriTokens.Spacing.lg)
+                .padding(.horizontal, MoriTokens.Spacing.sm)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -66,9 +66,8 @@ public struct WorktreeSidebarView: View {
     private var sidebarHeader: some View {
         HStack {
             Text("Worktrees")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .font(MoriTokens.Font.sectionTitle)
+                .foregroundStyle(MoriTokens.Color.muted)
 
             Spacer()
 
@@ -78,27 +77,27 @@ public struct WorktreeSidebarView: View {
                     newBranchName = ""
                 }) {
                     Image(systemName: "plus")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(MoriTokens.Font.label)
+                        .foregroundStyle(MoriTokens.Color.muted)
                 }
                 .buttonStyle(.plain)
                 .help("Create new worktree")
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, MoriTokens.Spacing.xl)
+        .padding(.vertical, MoriTokens.Spacing.md)
     }
 
     // MARK: - Branch Name Input
 
     private var branchNameInput: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: MoriTokens.Spacing.sm) {
             Image(systemName: "arrow.triangle.branch")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(MoriTokens.Font.label)
+                .foregroundStyle(MoriTokens.Color.muted)
 
             TextField("Branch name", text: $newBranchName)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .font(.subheadline)
                 .onSubmit {
                     submitBranchName()
@@ -106,19 +105,22 @@ public struct WorktreeSidebarView: View {
 
             Button(action: { submitBranchName() }) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(MoriTokens.Color.success)
             }
             .buttonStyle(.plain)
             .disabled(newBranchName.trimmingCharacters(in: .whitespaces).isEmpty)
 
             Button(action: { isCreatingWorktree = false }) {
                 Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MoriTokens.Color.muted)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, MoriTokens.Spacing.lg)
+        .padding(.vertical, MoriTokens.Spacing.sm)
+        .background(MoriTokens.Color.muted.opacity(MoriTokens.Opacity.subtle))
+        .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
+        .padding(.horizontal, MoriTokens.Spacing.sm)
     }
 
     private func submitBranchName() {
@@ -133,7 +135,7 @@ public struct WorktreeSidebarView: View {
 
     @ViewBuilder
     private func worktreeSection(_ worktree: Worktree) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: MoriTokens.Spacing.xs) {
             WorktreeRowView(
                 worktree: worktree,
                 isSelected: worktree.id == selectedWorktreeId,
@@ -159,24 +161,24 @@ public struct WorktreeSidebarView: View {
                     isActive: window.tmuxWindowId == selectedWindowId,
                     onSelect: { onSelectWindow(window.tmuxWindowId) }
                 )
-                .padding(.leading, 16)
+                .padding(.leading, MoriTokens.Spacing.xxl)
             }
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, MoriTokens.Spacing.sm)
     }
 
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: MoriTokens.Spacing.lg) {
             Image(systemName: "folder.badge.plus")
                 .font(.title2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MoriTokens.Color.muted)
             Text("No worktrees")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MoriTokens.Color.muted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 40)
+        .padding(.top, MoriTokens.Spacing.emptyState)
     }
 }

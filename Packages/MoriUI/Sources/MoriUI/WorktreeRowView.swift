@@ -7,6 +7,8 @@ public struct WorktreeRowView: View {
     let isSelected: Bool
     let onSelect: () -> Void
 
+    @State private var isHovered = false
+
     public init(
         worktree: Worktree,
         isSelected: Bool,
@@ -19,13 +21,13 @@ public struct WorktreeRowView: View {
 
     public var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 6) {
+            HStack(spacing: MoriTokens.Spacing.md) {
                 Image(systemName: "arrow.triangle.branch")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(MoriTokens.Font.label)
+                    .foregroundStyle(MoriTokens.Color.muted)
 
                 Text(worktree.branch ?? worktree.name)
-                    .font(.headline)
+                    .font(MoriTokens.Font.rowTitle)
                     .lineLimit(1)
 
                 Spacer()
@@ -36,60 +38,72 @@ public struct WorktreeRowView: View {
 
                 statusIndicator
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
+            .padding(.vertical, MoriTokens.Spacing.sm)
+            .padding(.horizontal, MoriTokens.Spacing.lg)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
+        .onHover { isHovered = $0 }
+    }
+
+    private var rowBackground: some ShapeStyle {
+        if isSelected {
+            return AnyShapeStyle(MoriTokens.Color.active.opacity(MoriTokens.Opacity.light))
+        } else if isHovered {
+            return AnyShapeStyle(MoriTokens.Color.muted.opacity(MoriTokens.Opacity.subtle))
+        } else {
+            return AnyShapeStyle(Color.clear)
+        }
     }
 
     // MARK: - Git Status Badges
 
     @ViewBuilder
     private var gitStatusBadges: some View {
-        HStack(spacing: 4) {
-            // Dirty indicator (uncommitted changes)
+        HStack(spacing: MoriTokens.Spacing.sm) {
             if worktree.hasUncommittedChanges {
                 Circle()
-                    .fill(Color.orange)
-                    .frame(width: 6, height: 6)
+                    .fill(MoriTokens.Color.warning)
+                    .frame(width: MoriTokens.Icon.dot, height: MoriTokens.Icon.dot)
                     .help("Uncommitted changes")
+                    .accessibilityLabel("Uncommitted changes")
             }
 
-            // Ahead/behind counts
             if worktree.aheadCount > 0 {
-                HStack(spacing: 1) {
+                HStack(spacing: MoriTokens.Spacing.xxs) {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: 8))
+                        .font(MoriTokens.Font.arrowIcon)
                     Text("\(worktree.aheadCount)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(MoriTokens.Font.monoSmall)
                 }
-                .foregroundStyle(.green)
+                .foregroundStyle(MoriTokens.Color.success)
                 .help("\(worktree.aheadCount) ahead of upstream")
+                .accessibilityLabel("\(worktree.aheadCount) ahead of upstream")
             }
 
             if worktree.behindCount > 0 {
-                HStack(spacing: 1) {
+                HStack(spacing: MoriTokens.Spacing.xxs) {
                     Image(systemName: "arrow.down")
-                        .font(.system(size: 8))
+                        .font(MoriTokens.Font.arrowIcon)
                     Text("\(worktree.behindCount)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(MoriTokens.Font.monoSmall)
                 }
-                .foregroundStyle(.red)
+                .foregroundStyle(MoriTokens.Color.error)
                 .help("\(worktree.behindCount) behind upstream")
+                .accessibilityLabel("\(worktree.behindCount) behind upstream")
             }
 
-            // Unread count badge
             if worktree.unreadCount > 0 {
                 Text("\(worktree.unreadCount)")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(MoriTokens.Font.badgeCount)
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.blue))
+                    .padding(.horizontal, MoriTokens.Spacing.sm)
+                    .padding(.vertical, MoriTokens.Spacing.xxs)
+                    .background(Capsule().fill(MoriTokens.Color.info))
                     .help("\(worktree.unreadCount) unread")
+                    .accessibilityLabel("\(worktree.unreadCount) unread")
             }
         }
     }
@@ -101,24 +115,28 @@ public struct WorktreeRowView: View {
         switch worktree.agentState {
         case .error:
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.red)
+                .font(.system(size: MoriTokens.Icon.badge))
+                .foregroundStyle(MoriTokens.Color.error)
                 .help("Agent error")
+                .accessibilityLabel("Agent error")
         case .waitingForInput:
             Image(systemName: "exclamationmark.bubble.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.yellow)
+                .font(.system(size: MoriTokens.Icon.badge))
+                .foregroundStyle(MoriTokens.Color.attention)
                 .help("Agent waiting for input")
+                .accessibilityLabel("Agent waiting for input")
         case .running:
             Image(systemName: "bolt.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.green)
+                .font(.system(size: MoriTokens.Icon.badge))
+                .foregroundStyle(MoriTokens.Color.success)
                 .help("Agent running")
+                .accessibilityLabel("Agent running")
         case .completed:
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.green)
+                .font(.system(size: MoriTokens.Icon.badge))
+                .foregroundStyle(MoriTokens.Color.success)
                 .help("Agent completed")
+                .accessibilityLabel("Agent completed")
         case .none:
             EmptyView()
         }
@@ -131,16 +149,19 @@ public struct WorktreeRowView: View {
         switch worktree.status {
         case .active:
             Circle()
-                .fill(Color.green)
-                .frame(width: 8, height: 8)
+                .fill(MoriTokens.Color.success)
+                .frame(width: MoriTokens.Icon.indicator, height: MoriTokens.Icon.indicator)
+                .accessibilityLabel("Active")
         case .inactive:
             Circle()
-                .fill(Color.gray)
-                .frame(width: 8, height: 8)
+                .fill(MoriTokens.Color.inactive)
+                .frame(width: MoriTokens.Icon.indicator, height: MoriTokens.Icon.indicator)
+                .accessibilityLabel("Inactive")
         case .unavailable:
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption2)
-                .foregroundStyle(.orange)
+                .font(MoriTokens.Font.caption)
+                .foregroundStyle(MoriTokens.Color.warning)
+                .accessibilityLabel("Unavailable")
         }
     }
 }

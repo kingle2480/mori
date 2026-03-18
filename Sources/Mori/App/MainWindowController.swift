@@ -26,7 +26,10 @@ final class MainWindowController: NSWindowController {
         )
         window.minSize = NSSize(width: 800, height: 500)
         window.title = "Mori"
-        window.center()
+        window.setFrameAutosaveName("MoriMainWindow")
+        if !window.setFrameUsingName("MoriMainWindow") {
+            window.center()
+        }
 
         super.init(window: window)
 
