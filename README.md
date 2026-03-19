@@ -1,0 +1,99 @@
+# Mori
+
+A native macOS workspace terminal organized around **Projects** and **Worktrees**, powered by **tmux** and **libghostty**.
+
+Instead of managing loose terminal tabs, Mori treats your git repositories as first-class projects. Each worktree (branch checkout) gets its own persistent tmux session with multiple windows and panes — all presented through a native sidebar and GPU-accelerated terminal.
+
+## Why Mori
+
+- **Project-first navigation** — switch between repos and branches, not anonymous tabs
+- **Persistent sessions** — close the app, reopen later, everything is still running in tmux
+- **Native macOS experience** — sidebar, command palette, notifications, keyboard shortcuts
+- **GPU-rendered terminal** — libghostty (Ghostty's rendering engine) with Metal acceleration
+- **Worktree-aware** — multiple branches of the same repo run side-by-side with independent sessions
+
+## How It Works
+
+```
+Project (git repo)
+  └─ Worktree (branch checkout)
+       └─ tmux Session
+            ├─ Window (tab)  →  Pane
+            ├─ Window         →  Pane | Pane
+            └─ Window         →  Pane
+```
+
+Each worktree maps to one tmux session. Windows and panes are standard tmux constructs. Mori provides the UI layer on top — organizing, navigating, and displaying status.
+
+## Architecture
+
+```
+App (AppKit shell + SwiftUI sidebar views)
+  ├─ MoriCore         — Models + observable app state
+  ├─ MoriUI           — SwiftUI sidebar views
+  ├─ MoriTmux         — tmux CLI integration (actor)
+  ├─ MoriGit          — Git worktree/status discovery (actor)
+  ├─ MoriTerminal     — libghostty terminal surface
+  ├─ MoriPersistence  — SQLite via GRDB
+  └─ MoriIPC          — Unix socket IPC + `ws` CLI
+```
+
+## Requirements
+
+- macOS 14 (Sonoma) or later
+- tmux
+- [mise](https://mise.jdx.dev/) (task runner)
+- Zig 0.15.2 + Xcode (for building libghostty)
+
+## Build & Run
+
+```bash
+mise run build           # Debug build
+mise run build:release   # Release build
+mise run dev             # Build + run
+mise run test            # Run all tests
+mise run clean           # Clean build artifacts
+```
+
+The libghostty XCFramework must be built first:
+
+```bash
+mise run build:ghostty   # Requires Zig 0.15.2 + Xcode
+```
+
+## CLI
+
+The `mori` command lets you interact with Mori from the terminal:
+
+```bash
+mori project list
+mori open /path/to/repo
+mori worktree create <project> <branch>
+mori focus <project> <worktree>
+mori send <project> <worktree> <window> "command"
+mori new-window <project> <worktree> <name>
+```
+
+## Terminal Configuration
+
+Mori uses Ghostty's configuration system. Customize your terminal in `~/.config/ghostty/config`. Mori only overrides a few embedding-specific settings (no window decorations, no quit-on-last-window).
+
+## Keyboard Shortcuts
+
+See [docs/keymaps.md](docs/keymaps.md) for the full list. Highlights:
+
+| Shortcut | Action |
+|----------|--------|
+| `⌘T` | New tab (tmux window) |
+| `⌘W` | Close pane |
+| `⌘D` / `⌘⇧D` | Split right / down |
+| `⌘1`–`⌘9` | Go to tab N |
+| `⌃Tab` / `⌃⇧Tab` | Cycle worktrees |
+| `⌘⇧P` | Command palette |
+| `⌘B` | Toggle sidebar |
+| `⌘G` | Lazygit |
+| `⌘E` | Yazi |
+
+## License
+
+[MIT](LICENSE)
