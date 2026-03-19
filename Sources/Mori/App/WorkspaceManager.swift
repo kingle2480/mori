@@ -994,13 +994,12 @@ final class WorkspaceManager {
         guard let worktree = selectedWorktree,
               let sessionName = worktree.tmuxSessionName else { return }
 
-        // Find the active pane from the latest tmux scan
-        let activePaneId = findActivePaneId(sessionName: sessionName)
-
         do {
+            // Target the session — tmux splits whatever pane is currently active.
+            // Don't use cached findActivePaneId which can be stale between polls.
             _ = try await tmuxBackend.splitPane(
                 sessionId: sessionName,
-                paneId: activePaneId ?? "",
+                paneId: "",
                 horizontal: horizontal,
                 cwd: worktree.path
             )
@@ -1018,6 +1017,29 @@ final class WorkspaceManager {
     /// Switch to the previous tmux window in the current session.
     func previousWindow() {
         navigateWindow(offset: -1)
+    }
+
+    /// Close the active tmux pane. If it is the last pane in the window the
+    /// window closes; if it is the last window the session is killed.
+    func closeCurrentPane() async {
+        guard let worktree = selectedWorktree,
+              let sessionName = worktree.tmuxSessionName else { return }
+
+        do {
+            // Target the session — tmux kills whatever pane is currently active.
+            // Don't use cached findActivePaneId which can be stale between polls.
+            try await tmuxBackend.killPane(sessionId: sessionName, paneId: sessionName)
+            await refreshRuntimeState()
+
+            // If the session was killed (last pane in last window), detach
+            let stillHasWindows = appState.runtimeWindows.contains { $0.worktreeId == worktree.id }
+            if !stillHasWindows {
+                appState.uiState.selectedWindowId = nil
+                onTerminalDetach?()
+            }
+        } catch {
+            showErrorAlert(title: "Failed to close pane", message: error.localizedDescription)
+        }
     }
 
     /// Close the currently selected tmux window.

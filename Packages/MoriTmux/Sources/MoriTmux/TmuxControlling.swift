@@ -45,6 +45,9 @@ public protocol TmuxControlling: Sendable {
     /// Kill (destroy) a window.
     func killWindow(sessionId: String, windowId: String) async throws
 
+    /// Kill (destroy) a pane. If it is the last pane in the window, the window closes.
+    func killPane(sessionId: String, paneId: String) async throws
+
     /// Set a tmux server-wide option.
     func setServerOption(option: String, value: String) async throws
 
@@ -107,6 +110,10 @@ public extension TmuxControlling {
 
     func killWindow(sessionId: String, windowId: String) async throws {
         throw TmuxError.notYetImplemented("killWindow")
+    }
+
+    func killPane(sessionId: String, paneId: String) async throws {
+        throw TmuxError.notYetImplemented("killPane")
     }
 
     func setServerOption(option: String, value: String) async throws {

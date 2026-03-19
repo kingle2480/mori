@@ -197,6 +197,12 @@ public actor TmuxBackend: TmuxControlling {
         )
     }
 
+    public func killPane(sessionId: String, paneId: String) async throws {
+        _ = try await runner.run(
+            "kill-pane", "-t", paneId
+        )
+    }
+
     public func setServerOption(option: String, value: String) async throws {
         _ = try await runner.run("set-option", "-s", option, value)
     }

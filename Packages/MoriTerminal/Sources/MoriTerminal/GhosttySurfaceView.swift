@@ -222,34 +222,7 @@ public final class GhosttySurfaceView: NSView {
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
-        guard let surface = ghosttySurface else { return false }
-
-        // 1. Let Mori's menu bar handle any matching key equivalent first.
-        //    NSMenu's own matching correctly handles Shift+symbol mapping,
-        //    case sensitivity, and modifier flags — no manual comparison needed.
-        //    This ensures Mori-specific shortcuts (Cmd+G lazygit, Cmd+E yazi,
-        //    Cmd+0 sidebar, etc.) always take priority.
-        if let mainMenu = NSApp.mainMenu,
-           mainMenu.performKeyEquivalent(with: event) {
-            return true
-        }
-
-        // 2. Check if ghostty considers this a key binding. Ghostty handles
-        //    key-to-action mapping and fires actions via the runtime callback.
-        //    Mori intercepts those actions in GhosttyApp.onAction to redirect
-        //    to tmux. This lets users add custom keybindings via ghostty config.
-        var ghosttyEvent = ghosttyKeyEvent(GHOSTTY_ACTION_PRESS, event: event)
-        let text = event.characters ?? ""
-        let isBinding = text.withCString { ptr in
-            ghosttyEvent.text = ptr
-            var flags = ghostty_binding_flags_e(rawValue: 0)
-            return ghostty_surface_key_is_binding(surface, ghosttyEvent, &flags)
-        }
-
-        if isBinding {
-            keyDown(with: event)
-            return true
-        }
+        guard ghosttySurface != nil else { return false }
 
         // Handle Ctrl+Return (prevent default context menu equivalent)
         if event.modifierFlags.contains(.control),
@@ -266,10 +239,14 @@ public final class GhosttySurfaceView: NSView {
             return true
         }
 
-        // Ignore synthetic events (zero timestamp)
-        if event.timestamp == 0 { return false }
-
-        // Not a menu shortcut or ghostty binding — let AppKit handle.
+        // Return false for everything else. AppKit's normal flow handles the rest:
+        //   1. NSApp tries mainMenu.performKeyEquivalent — Mori menu shortcuts
+        //      (⌘T, ⌘W, ⌘D, ⌘G, ⌘], etc.) fire their @objc actions.
+        //   2. If the menu doesn't match, the event becomes a regular keyDown
+        //      sent to this view (the first responder). Ghostty processes it
+        //      and fires actions for its own keybindings (clear_screen, font
+        //      size, custom user bindings, etc.) via the onAction callback.
+        // This avoids re-entrant menu calls and stale-state issues.
         return false
     }
 

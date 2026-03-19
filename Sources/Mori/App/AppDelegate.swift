@@ -400,43 +400,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func setupMainMenu() {
         let mainMenu = NSMenu()
 
-        // App menu
+        // ── Mori (app) ──────────────────────────────────────────────
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About Mori", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettingsMenuAction), keyEquivalent: ",")
-        settingsItem.target = self
-        appMenu.addItem(settingsItem)
+        appMenu.addItem(menuItem("Open Project…", action: #selector(openProjectMenuAction), key: "o", mods: [.command, .shift]))
+        appMenu.addItem(.separator())
+        appMenu.addItem(menuItem("Settings…", action: #selector(showSettingsMenuAction), key: ","))
+        appMenu.addItem(menuItem("Reload Settings", action: #selector(reloadSettingsMenuAction), key: ",", mods: [.command, .shift]))
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide Mori", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthersItem = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
-        hideOthersItem.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(menuItem("Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), key: "h", mods: [.command, .option]))
         appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Mori", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
-        // File menu
-        let fileMenuItem = NSMenuItem()
-        let fileMenu = NSMenu(title: "File")
-        let openProjectItem = NSMenuItem(title: "Open Project...", action: #selector(openProjectMenuAction), keyEquivalent: "o")
-        openProjectItem.keyEquivalentModifierMask = [.command, .shift]
-        openProjectItem.target = self
-        fileMenu.addItem(openProjectItem)
-        fileMenu.addItem(.separator())
-        let closeTabFileItem = NSMenuItem(title: "Close Tab", action: #selector(closeTabMenuAction), keyEquivalent: "w")
-        closeTabFileItem.target = self
-        fileMenu.addItem(closeTabFileItem)
-        let closeItem = NSMenuItem(title: "Close Window", action: #selector(closeWindowMenuAction), keyEquivalent: "w")
-        closeItem.keyEquivalentModifierMask = [.command, .shift]
-        closeItem.target = self
-        fileMenu.addItem(closeItem)
-        fileMenuItem.submenu = fileMenu
-        mainMenu.addItem(fileMenuItem)
-
-        // Edit menu — copy/paste/select all pass through responder chain to terminal
+        // ── Edit ─────────────────────────────────────────────────────
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
@@ -449,93 +431,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         editMenuItem.submenu = editMenu
         mainMenu.addItem(editMenuItem)
 
-        // View menu
-        let viewMenuItem = NSMenuItem()
-        let viewMenu = NSMenu(title: "View")
-        let toggleSidebarItem = NSMenuItem(title: "Toggle Sidebar", action: #selector(toggleSidebarMenuAction), keyEquivalent: "0")
-        toggleSidebarItem.target = self
-        viewMenu.addItem(toggleSidebarItem)
-        viewMenu.addItem(.separator())
-        viewMenu.addItem(withTitle: "Toggle Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
-            .keyEquivalentModifierMask = [.command, .control]
-        viewMenuItem.submenu = viewMenu
-        mainMenu.addItem(viewMenuItem)
+        // ── Tmux (tabs, panes, tools) ────────────────────────────────
+        let tmuxMenuItem = NSMenuItem()
+        let tmuxMenu = NSMenu(title: "Tmux")
 
-        // Session menu — Tab management (tmux windows)
-        let sessionMenuItem = NSMenuItem()
-        let sessionMenu = NSMenu(title: "Session")
+        tmuxMenu.addItem(menuItem("New Tab", action: #selector(newTabMenuAction), key: "t"))
+        tmuxMenu.addItem(menuItem("Close Pane", action: #selector(closePaneMenuAction), key: "w"))
+        tmuxMenu.addItem(.separator())
+        tmuxMenu.addItem(menuItem("Next Tab", action: #selector(nextTabMenuAction), key: "]", mods: [.command, .shift]))
+        tmuxMenu.addItem(menuItem("Previous Tab", action: #selector(previousTabMenuAction), key: "[", mods: [.command, .shift]))
+        tmuxMenu.addItem(.separator())
+        tmuxMenu.addItem(menuItem("Split Right", action: #selector(splitRightMenuAction), key: "d"))
+        tmuxMenu.addItem(menuItem("Split Down", action: #selector(splitDownMenuAction), key: "d", mods: [.command, .shift]))
+        tmuxMenu.addItem(.separator())
+        tmuxMenu.addItem(menuItem("Next Pane", action: #selector(nextPaneMenuAction), key: "]"))
+        tmuxMenu.addItem(menuItem("Previous Pane", action: #selector(previousPaneMenuAction), key: "["))
+        tmuxMenu.addItem(menuItem("Toggle Pane Zoom", action: #selector(togglePaneZoomMenuAction), key: "\r", mods: [.command, .shift]))
+        tmuxMenu.addItem(menuItem("Equalize Panes", action: #selector(equalizePanesMenuAction), key: "=", mods: [.command, .control]))
+        tmuxMenu.addItem(.separator())
+        tmuxMenu.addItem(menuItem("Open Lazygit", action: #selector(openLazygitMenuAction), key: "g"))
+        tmuxMenu.addItem(menuItem("Open Yazi", action: #selector(openYaziMenuAction), key: "e"))
 
-        let newTabItem = NSMenuItem(title: "New Tab", action: #selector(newWindowMenuAction), keyEquivalent: "t")
-        newTabItem.target = self
-        sessionMenu.addItem(newTabItem)
+        tmuxMenuItem.submenu = tmuxMenu
+        mainMenu.addItem(tmuxMenuItem)
 
-        let nextTabItem = NSMenuItem(title: "Next Tab", action: #selector(nextWindowMenuAction), keyEquivalent: "]")
-        nextTabItem.keyEquivalentModifierMask = [.command, .shift]
-        nextTabItem.target = self
-        sessionMenu.addItem(nextTabItem)
-
-        let prevTabItem = NSMenuItem(title: "Previous Tab", action: #selector(previousWindowMenuAction), keyEquivalent: "[")
-        prevTabItem.keyEquivalentModifierMask = [.command, .shift]
-        prevTabItem.target = self
-        sessionMenu.addItem(prevTabItem)
-
-        sessionMenu.addItem(.separator())
-
-        // Split pane management
-        let splitHItem = NSMenuItem(title: "Split Right", action: #selector(splitHorizontalMenuAction), keyEquivalent: "d")
-        splitHItem.target = self
-        sessionMenu.addItem(splitHItem)
-
-        let splitVItem = NSMenuItem(title: "Split Down", action: #selector(splitVerticalMenuAction), keyEquivalent: "d")
-        splitVItem.keyEquivalentModifierMask = [.command, .shift]
-        splitVItem.target = self
-        sessionMenu.addItem(splitVItem)
-
-        sessionMenu.addItem(.separator())
-
-        // Pane navigation
-        let nextPaneItem = NSMenuItem(title: "Next Pane", action: #selector(nextPaneMenuAction), keyEquivalent: "]")
-        nextPaneItem.target = self
-        sessionMenu.addItem(nextPaneItem)
-
-        let prevPaneItem = NSMenuItem(title: "Previous Pane", action: #selector(previousPaneMenuAction), keyEquivalent: "[")
-        prevPaneItem.target = self
-        sessionMenu.addItem(prevPaneItem)
-
-        let zoomPaneItem = NSMenuItem(title: "Toggle Pane Zoom", action: #selector(togglePaneZoomMenuAction), keyEquivalent: "\r")
-        zoomPaneItem.keyEquivalentModifierMask = [.command, .shift]
-        zoomPaneItem.target = self
-        sessionMenu.addItem(zoomPaneItem)
-
-        let equalizeItem = NSMenuItem(title: "Equalize Panes", action: #selector(equalizePanesMenuAction), keyEquivalent: "=")
-        equalizeItem.keyEquivalentModifierMask = [.command, .control]
-        equalizeItem.target = self
-        sessionMenu.addItem(equalizeItem)
-
-        sessionMenu.addItem(.separator())
-
-        // Tools
-        let lazygitItem = NSMenuItem(title: "Open Lazygit", action: #selector(openLazygitMenuAction), keyEquivalent: "g")
-        lazygitItem.target = self
-        sessionMenu.addItem(lazygitItem)
-
-        let yaziItem = NSMenuItem(title: "Open Yazi", action: #selector(openYaziMenuAction), keyEquivalent: "e")
-        yaziItem.target = self
-        sessionMenu.addItem(yaziItem)
-
-        sessionMenuItem.submenu = sessionMenu
-        mainMenu.addItem(sessionMenuItem)
-
-        // Window menu
+        // ── Window (view + window merged) ────────────────────────────
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(menuItem("Toggle Sidebar", action: #selector(toggleSidebarMenuAction), key: "b"))
+        windowMenu.addItem(menuItem("Toggle Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), key: "f", mods: [.command, .control]))
+        windowMenu.addItem(.separator())
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(menuItem("Close Window", action: #selector(closeWindowMenuAction), key: "w", mods: [.command, .shift]))
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
         NSApp.windowsMenu = windowMenu
 
         NSApp.mainMenu = mainMenu
+    }
+
+    /// Helper to create an NSMenuItem with target = self.
+    private func menuItem(
+        _ title: String,
+        action: Selector,
+        key: String,
+        mods: NSEvent.ModifierFlags = [.command]
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = mods
+        // Items targeting system selectors (NSWindow.toggleFullScreen, etc.)
+        // should not set a target so they route via the responder chain.
+        let systemActions: Set<String> = [
+            NSStringFromSelector(#selector(NSWindow.toggleFullScreen(_:))),
+            NSStringFromSelector(#selector(NSApplication.hideOtherApplications(_:))),
+        ]
+        if !systemActions.contains(NSStringFromSelector(action)) {
+            item.target = self
+        }
+        return item
     }
 
     @objc private func openProjectMenuAction() {
@@ -546,9 +500,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         rootSplitVC?.toggleSidebar()
     }
 
-    @objc private func newWindowMenuAction() {
+    @objc private func newTabMenuAction() {
         guard let manager = workspaceManager else { return }
         Task { @MainActor in await manager.createNewWindow() }
+    }
+
+    @objc private func closePaneMenuAction() {
+        guard let manager = workspaceManager else { return }
+        Task { @MainActor in await manager.closeCurrentPane() }
     }
 
     @objc private func closeWindowMenuAction() {
@@ -565,27 +524,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Task { @MainActor in await manager.openToolWindow(command: "yazi") }
     }
 
-    @objc private func splitHorizontalMenuAction() {
+    @objc private func splitRightMenuAction() {
         guard let manager = workspaceManager else { return }
         Task { @MainActor in await manager.splitCurrentPane(horizontal: true) }
     }
 
-    @objc private func splitVerticalMenuAction() {
+    @objc private func splitDownMenuAction() {
         guard let manager = workspaceManager else { return }
         Task { @MainActor in await manager.splitCurrentPane(horizontal: false) }
     }
 
-    @objc private func nextWindowMenuAction() {
+    @objc private func nextTabMenuAction() {
         workspaceManager?.nextWindow()
     }
 
-    @objc private func previousWindowMenuAction() {
+    @objc private func previousTabMenuAction() {
         workspaceManager?.previousWindow()
-    }
-
-    @objc private func closeTabMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.closeCurrentWindow() }
     }
 
     @objc private func nextPaneMenuAction() {
@@ -608,45 +562,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Task { @MainActor in await manager.equalizePanes() }
     }
 
-    @objc private func navigatePaneUpMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.navigatePane(direction: .up) }
-    }
-
-    @objc private func navigatePaneDownMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.navigatePane(direction: .down) }
-    }
-
-    @objc private func navigatePaneLeftMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.navigatePane(direction: .left) }
-    }
-
-    @objc private func navigatePaneRightMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.navigatePane(direction: .right) }
-    }
-
-    @objc private func resizePaneUpMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.resizePane(direction: .up) }
-    }
-
-    @objc private func resizePaneDownMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.resizePane(direction: .down) }
-    }
-
-    @objc private func resizePaneLeftMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.resizePane(direction: .left) }
-    }
-
-    @objc private func resizePaneRightMenuAction() {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in await manager.resizePane(direction: .right) }
-    }
 
     // MARK: - Ghostty Action Handler
 
@@ -658,7 +573,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         case .newTab:
             Task { await manager.createNewWindow() }
         case .closeTab:
-            Task { await manager.closeCurrentWindow() }
+            Task { await manager.closeCurrentPane() }
         case .gotoTab(let target):
             switch target {
             case .previous: manager.previousWindow()
@@ -893,6 +808,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     @objc private func showSettingsMenuAction() {
         showSettingsWindow()
+    }
+
+    @objc private func reloadSettingsMenuAction() {
+        terminalAreaController?.reloadConfig()
     }
 
     // MARK: - Single Instance (Task 3.8)

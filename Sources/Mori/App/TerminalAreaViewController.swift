@@ -43,6 +43,11 @@ final class TerminalAreaViewController: NSViewController {
         (terminalHost as? GhosttyAdapter)?.themeInfo ?? .fallback
     }
 
+    /// Reload ghostty config from disk (e.g., after editing ~/.config/ghostty/config).
+    func reloadConfig() {
+        (terminalHost as? GhosttyAdapter)?.reloadConfig()
+    }
+
     override func loadView() {
         let container = NSView()
         container.wantsLayer = true
