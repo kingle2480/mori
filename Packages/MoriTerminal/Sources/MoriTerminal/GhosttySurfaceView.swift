@@ -19,10 +19,17 @@ public final class GhosttySurfaceView: NSView {
     private var trackingArea: NSTrackingArea?
 
     override init(frame: NSRect) {
-        super.init(frame: frame)
+        // Use a non-zero initial frame so ghostty's renderer can initialize.
+        // Ghostty requires non-zero layer bounds to set up Metal rendering.
+        let initialFrame = frame.size == .zero
+            ? NSRect(x: 0, y: 0, width: 800, height: 600)
+            : frame
+        super.init(frame: initialFrame)
         wantsLayer = true
         layer?.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
     }
+
+    public override var isFlipped: Bool { true }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {

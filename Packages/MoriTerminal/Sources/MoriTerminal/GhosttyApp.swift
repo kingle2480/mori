@@ -43,23 +43,10 @@ final class GhosttyApp {
             return
         }
 
-        // Build runtime config with callbacks
-        var runtimeConfig = ghostty_runtime_config_s(
-            userdata: Unmanaged.passUnretained(self).toOpaque(),
-            supports_selection_clipboard: false,
-            wakeup_cb: { userdata in GhosttyApp.onWakeup(userdata) },
-            action_cb: { app, target, action in GhosttyApp.onAction(app, target: target, action: action) },
-            read_clipboard_cb: { userdata, loc, state in GhosttyApp.onReadClipboard(userdata, location: loc, state: state) },
-            confirm_read_clipboard_cb: { userdata, str, state, request in
-                GhosttyApp.onConfirmReadClipboard(userdata, string: str, state: state, request: request)
-            },
-            write_clipboard_cb: { userdata, loc, content, len, confirm in
-                GhosttyApp.onWriteClipboard(userdata, location: loc, content: content, len: len, confirm: confirm)
-            },
-            close_surface_cb: { userdata, processAlive in
-                GhosttyApp.onCloseSurface(userdata, processAlive: processAlive)
-            }
-        )
+        // Build runtime config in nonisolated context so closures don't
+        // inherit @MainActor isolation (they're called from renderer thread).
+        let userdata = Unmanaged.passUnretained(self).toOpaque()
+        var runtimeConfig = Self.makeRuntimeConfig(userdata: userdata)
 
         guard let app = ghostty_app_new(&runtimeConfig, config) else {
             NSLog("[GhosttyApp] ghostty_app_new failed")
@@ -128,6 +115,33 @@ final class GhosttyApp {
     func tick() {
         guard let app else { return }
         ghostty_app_tick(app)
+    }
+
+    // MARK: - Runtime Config Factory
+
+    /// Build runtime config in a nonisolated context. This is critical because
+    /// ghostty calls these callbacks from its renderer/IO threads, and closures
+    /// created inside @MainActor methods inherit that isolation, causing
+    /// dispatch_assert_queue_fail crashes.
+    private nonisolated static func makeRuntimeConfig(
+        userdata: UnsafeMutableRawPointer
+    ) -> ghostty_runtime_config_s {
+        ghostty_runtime_config_s(
+            userdata: userdata,
+            supports_selection_clipboard: false,
+            wakeup_cb: { userdata in GhosttyApp.onWakeup(userdata) },
+            action_cb: { app, target, action in GhosttyApp.onAction(app, target: target, action: action) },
+            read_clipboard_cb: { userdata, loc, state in GhosttyApp.onReadClipboard(userdata, location: loc, state: state) },
+            confirm_read_clipboard_cb: { userdata, str, state, request in
+                GhosttyApp.onConfirmReadClipboard(userdata, string: str, state: state, request: request)
+            },
+            write_clipboard_cb: { userdata, loc, content, len, confirm in
+                GhosttyApp.onWriteClipboard(userdata, location: loc, content: content, len: len, confirm: confirm)
+            },
+            close_surface_cb: { userdata, processAlive in
+                GhosttyApp.onCloseSurface(userdata, processAlive: processAlive)
+            }
+        )
     }
 
     // MARK: - Runtime Callbacks (static, called from C)
