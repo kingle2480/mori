@@ -156,6 +156,7 @@ rm -rf "$GHOSTTY_DIR/.zig-cache"
 echo "Building GhosttyKit XCFramework (this may take a few minutes)..."
 zig build \
     -Demit-xcframework=true \
+    -Demit-macos-app=false \
     -Dxcframework-target=native \
     -Dapp-runtime=none \
     -Doptimize=ReleaseFast
