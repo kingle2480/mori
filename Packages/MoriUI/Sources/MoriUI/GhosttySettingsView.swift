@@ -74,6 +74,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 public struct GhosttySettingsView: View {
     @Binding var model: GhosttySettingsModel
     var availableThemes: [String]
+    var ghosttyDefaults: [String]
     var onChanged: () -> Void
     var onOpenConfigFile: () -> Void
 
@@ -82,11 +83,13 @@ public struct GhosttySettingsView: View {
     public init(
         model: Binding<GhosttySettingsModel>,
         availableThemes: [String],
+        ghosttyDefaults: [String] = [],
         onChanged: @escaping () -> Void,
         onOpenConfigFile: @escaping () -> Void
     ) {
         self._model = model
         self.availableThemes = availableThemes
+        self.ghosttyDefaults = ghosttyDefaults
         self.onChanged = onChanged
         self.onOpenConfigFile = onOpenConfigFile
     }
@@ -179,7 +182,7 @@ public struct GhosttySettingsView: View {
                     case .theme: ThemeSettingsContent(model: $model, availableThemes: availableThemes, onChanged: onChanged)
                     case .fonts: FontSettingsContent(model: $model, onChanged: onChanged)
                     case .cursor: CursorSettingsContent(model: $model, onChanged: onChanged)
-                    case .keyboard: KeyboardSettingsContent(model: $model, onChanged: onChanged)
+                    case .keyboard: KeyboardSettingsContent(model: $model, onChanged: onChanged, ghosttyDefaults: ghosttyDefaults)
                     case .mouse: MouseSettingsContent(model: $model, onChanged: onChanged)
                     case .window: WindowSettingsContent(model: $model, onChanged: onChanged)
                     }
@@ -636,15 +639,39 @@ private struct CursorSettingsContent: View {
 
 // MARK: - Keyboard Settings
 
+/// A single keybind entry for display.
+private struct KeybindEntry: Identifiable {
+    let id: String
+    let keys: String
+    let action: String
+    let source: KeybindSource
+
+    enum KeybindSource {
+        case mori       // Mori app shortcuts (not editable)
+        case ghostty    // Ghostty defaults (not editable here)
+        case user       // User overrides in ghostty config (editable)
+    }
+}
+
 private struct KeyboardSettingsContent: View {
     @Binding var model: GhosttySettingsModel
     let onChanged: () -> Void
+    let ghosttyDefaults: [String]
+
+    @State private var keybindFilter = ""
+    @State private var newKeybind = ""
+
+    init(model: Binding<GhosttySettingsModel>, onChanged: @escaping () -> Void, ghosttyDefaults: [String] = []) {
+        self._model = model
+        self.onChanged = onChanged
+        self.ghosttyDefaults = ghosttyDefaults
+    }
 
     var body: some View {
         SettingsCard {
             SettingRow(
                 title: "Option as Alt",
-                description: "Treat the macOS Option key as Alt for terminal escape sequences. Disables special character input when enabled."
+                description: "Treat the macOS Option key as Alt for terminal escape sequences."
             ) {
                 Picker("", selection: $model.macosOptionAsAlt) {
                     Text("Off").tag("false")
@@ -659,48 +686,232 @@ private struct KeyboardSettingsContent: View {
             }
         }
 
+        // All keymaps
         SettingsCard {
             HStack {
-                Text("Custom Keybinds")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                Text("Keybindings")
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("\(model.keybinds.count)")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.tertiary)
             }
 
-            if model.keybinds.isEmpty {
-                Text("No custom keybinds configured.")
-                    .font(.system(size: 12))
+            // Search filter
+            HStack {
+                Image(systemName: "magnifyingglass")
                     .foregroundStyle(.tertiary)
-                    .padding(.vertical, 8)
-            } else {
-                ForEach(Array(model.keybinds.enumerated()), id: \.offset) { index, bind in
-                    if index > 0 { CardDivider() }
-                    HStack {
-                        Text(bind)
-                            .font(.system(size: 12, design: .monospaced))
-                            .lineLimit(1)
-                        Spacer()
-                        Button {
-                            model.keybinds.remove(at: index)
-                            onChanged()
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                TextField("Filter keybindings…", text: $keybindFilter)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                if !keybindFilter.isEmpty {
+                    Button { keybindFilter = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.04))
+            )
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    // User overrides first
+                    if !filteredUserBinds.isEmpty {
+                        keybindSectionHeader("User Overrides", count: filteredUserBinds.count)
+                        ForEach(Array(filteredUserBinds.enumerated()), id: \.offset) { index, entry in
+                            userKeybindRow(entry, index: index)
                         }
-                        .buttonStyle(.plain)
+                    }
+
+                    // Mori app shortcuts
+                    keybindSectionHeader("Mori App", count: filteredMoriBinds.count)
+                    ForEach(filteredMoriBinds) { entry in
+                        keybindRow(entry)
+                    }
+
+                    // Ghostty defaults
+                    if !filteredGhosttyBinds.isEmpty {
+                        keybindSectionHeader("Ghostty Defaults", count: filteredGhosttyBinds.count)
+                        ForEach(filteredGhosttyBinds) { entry in
+                            keybindRow(entry)
+                        }
                     }
                 }
             }
+            .frame(height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+            )
 
             CardDivider()
 
-            Text("Edit the config file to add new keybinds.")
+            // Add new keybind
+            HStack(spacing: 8) {
+                TextField("e.g. super+k=clear_screen", text: $newKeybind)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, design: .monospaced))
+                    .onSubmit { addKeybind() }
+
+                Button(action: addKeybind) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .disabled(newKeybind.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.04))
+            )
+
+            Text("Format: key_combo=action (e.g. super+shift+p=toggle_command_palette)")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func addKeybind() {
+        let trimmed = newKeybind.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        model.keybinds.append(trimmed)
+        newKeybind = ""
+        onChanged()
+    }
+
+    // MARK: - Keybind Rows
+
+    private func keybindSectionHeader(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("(\(count))")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.tertiary)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.03))
+    }
+
+    private func keybindRow(_ entry: KeybindEntry) -> some View {
+        HStack {
+            Text(entry.keys)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.primary)
+                .frame(minWidth: 140, alignment: .leading)
+
+            Text(entry.action)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+    }
+
+    private func userKeybindRow(_ entry: KeybindEntry, index: Int) -> some View {
+        HStack {
+            Text(entry.keys)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.primary)
+                .frame(minWidth: 140, alignment: .leading)
+
+            Text(entry.action)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer()
+
+            Button {
+                model.keybinds.remove(at: index)
+                onChanged()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Color.accentColor.opacity(0.05))
+    }
+
+    // MARK: - Data
+
+    private static let moriKeybinds: [KeybindEntry] = [
+        KeybindEntry(id: "m.new-tab", keys: "⌘T", action: "New Tab", source: .mori),
+        KeybindEntry(id: "m.close-tab", keys: "⌘W", action: "Close Tab", source: .mori),
+        KeybindEntry(id: "m.close-window", keys: "⇧⌘W", action: "Close Window", source: .mori),
+        KeybindEntry(id: "m.next-tab", keys: "⇧⌘]", action: "Next Tab", source: .mori),
+        KeybindEntry(id: "m.prev-tab", keys: "⇧⌘[", action: "Previous Tab", source: .mori),
+        KeybindEntry(id: "m.tab-1-8", keys: "⌘1–8", action: "Go to Tab N", source: .mori),
+        KeybindEntry(id: "m.tab-9", keys: "⌘9", action: "Last Tab", source: .mori),
+        KeybindEntry(id: "m.split-right", keys: "⌘D", action: "Split Right", source: .mori),
+        KeybindEntry(id: "m.split-down", keys: "⇧⌘D", action: "Split Down", source: .mori),
+        KeybindEntry(id: "m.next-pane", keys: "⌘]", action: "Next Pane", source: .mori),
+        KeybindEntry(id: "m.prev-pane", keys: "⌘[", action: "Previous Pane", source: .mori),
+        KeybindEntry(id: "m.pane-nav", keys: "⌥⌘↑↓←→", action: "Directional Pane Nav", source: .mori),
+        KeybindEntry(id: "m.pane-resize", keys: "⌃⌘↑↓←→", action: "Resize Pane", source: .mori),
+        KeybindEntry(id: "m.equalize", keys: "⌃⌘=", action: "Equalize Panes", source: .mori),
+        KeybindEntry(id: "m.zoom-pane", keys: "⇧⌘↩", action: "Toggle Pane Zoom", source: .mori),
+        KeybindEntry(id: "m.cycle-wt", keys: "⌃Tab", action: "Next Worktree", source: .mori),
+        KeybindEntry(id: "m.cycle-wt-rev", keys: "⌃⇧Tab", action: "Previous Worktree", source: .mori),
+        KeybindEntry(id: "m.palette", keys: "⇧⌘P", action: "Command Palette", source: .mori),
+        KeybindEntry(id: "m.lazygit", keys: "⌘G", action: "Open Lazygit", source: .mori),
+        KeybindEntry(id: "m.yazi", keys: "⌘E", action: "Open Yazi", source: .mori),
+        KeybindEntry(id: "m.settings", keys: "⌘,", action: "Settings", source: .mori),
+        KeybindEntry(id: "m.sidebar", keys: "⌘0", action: "Toggle Sidebar", source: .mori),
+        KeybindEntry(id: "m.open-proj", keys: "⇧⌘O", action: "Open Project", source: .mori),
+    ]
+
+    private var ghosttyEntries: [KeybindEntry] {
+        ghosttyDefaults.enumerated().compactMap { index, raw in
+            guard let eqIndex = raw.firstIndex(of: "=") else { return nil }
+            let keys = String(raw[raw.startIndex..<eqIndex])
+            let action = String(raw[raw.index(after: eqIndex)...])
+            return KeybindEntry(id: "g.\(index)", keys: keys, action: action, source: .ghostty)
+        }
+    }
+
+    private var userEntries: [KeybindEntry] {
+        model.keybinds.enumerated().compactMap { index, raw in
+            guard let eqIndex = raw.firstIndex(of: "=") else { return nil }
+            let keys = String(raw[raw.startIndex..<eqIndex])
+            let action = String(raw[raw.index(after: eqIndex)...])
+            return KeybindEntry(id: "u.\(index)", keys: keys, action: action, source: .user)
+        }
+    }
+
+    private var filteredMoriBinds: [KeybindEntry] {
+        filterEntries(Self.moriKeybinds)
+    }
+
+    private var filteredGhosttyBinds: [KeybindEntry] {
+        filterEntries(ghosttyEntries)
+    }
+
+    private var filteredUserBinds: [KeybindEntry] {
+        filterEntries(userEntries)
+    }
+
+    private func filterEntries(_ entries: [KeybindEntry]) -> [KeybindEntry] {
+        guard !keybindFilter.isEmpty else { return entries }
+        let query = keybindFilter.lowercased()
+        return entries.filter {
+            $0.keys.lowercased().contains(query) || $0.action.lowercased().contains(query)
         }
     }
 }

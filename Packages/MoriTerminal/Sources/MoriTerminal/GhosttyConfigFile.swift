@@ -116,6 +116,63 @@ public final class GhosttyConfigFile {
         try? content.write(toFile: Self.configPath, atomically: true, encoding: .utf8)
     }
 
+    /// Set all values for a repeatable key, replacing all existing entries.
+    public func setAll(_ key: String, values: [String]) {
+        // Remove all existing entries for this key
+        lines.removeAll { line in
+            if case .keyValue(let k, _, _) = line, k == key { return true }
+            return false
+        }
+        // Append new entries
+        for value in values {
+            lines.append(.keyValue(key, value, "\(key) = \(value)"))
+        }
+    }
+
+    /// List ghostty default keybindings by running `ghostty +list-keybinds`.
+    /// Returns array of "key=action" strings.
+    public static func defaultKeybinds() -> [String] {
+        let process = Process()
+        let pipe = Pipe()
+
+        // Try common paths for ghostty binary
+        let paths = ["/usr/local/bin/ghostty", "/opt/homebrew/bin/ghostty", "/Applications/Ghostty.app/Contents/MacOS/ghostty"]
+        var binaryPath: String?
+        for path in paths {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                binaryPath = path
+                break
+            }
+        }
+        guard let binary = binaryPath else { return [] }
+
+        process.executableURL = URL(fileURLWithPath: binary)
+        process.arguments = ["+list-keybinds"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return []
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else { return [] }
+
+        return output.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .compactMap { line in
+                // Parse "keybind = key=action" → "key=action"
+                if line.hasPrefix("keybind = ") {
+                    return String(line.dropFirst("keybind = ".count))
+                }
+                return line
+            }
+    }
+
     /// List available ghostty theme names from the app bundle.
     public static func availableThemes() -> [String] {
         let searchPaths = [
