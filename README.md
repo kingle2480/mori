@@ -1,4 +1,6 @@
-# Mori
+<p align="center">
+  <img src="assets/banner.svg" alt="Mori" width="600">
+</p>
 
 A native macOS workspace terminal organized around **Projects** and **Worktrees**, powered by **tmux** and **libghostty**.
 
