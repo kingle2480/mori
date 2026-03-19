@@ -2,6 +2,10 @@
   <img src="assets/banner.svg" alt="Mori" width="600">
 </p>
 
+<p align="center">
+  <b>English</b> | <a href="README.zh.md">中文</a>
+</p>
+
 A native macOS workspace terminal organized around **Projects** and **Worktrees**, powered by **tmux** and **libghostty**.
 
 Instead of managing loose terminal tabs, Mori treats your git repositories as first-class projects. Each worktree (branch checkout) gets its own persistent tmux session with multiple windows and panes — all presented through a native sidebar and GPU-accelerated terminal.
