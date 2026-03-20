@@ -63,6 +63,7 @@ public struct AgentHookModel: Equatable {
 // MARK: - Settings Category
 
 enum SettingsCategory: String, CaseIterable, Identifiable {
+    case general = "General"
     case theme = "Theme"
     case fonts = "Fonts"
     case cursor = "Cursor"
@@ -73,8 +74,13 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var localizedName: String {
+        .localized(String.LocalizationValue(stringLiteral: rawValue))
+    }
+
     var icon: String {
         switch self {
+        case .general: return "gearshape"
         case .theme: return "paintpalette"
         case .fonts: return "textformat"
         case .cursor: return "character.cursor.ibeam"
@@ -97,7 +103,7 @@ public struct GhosttySettingsView: View {
     @Binding var agentHooks: AgentHookModel
     var onAgentHookChanged: ((AgentHookModel) -> Void)?
 
-    @State private var selectedCategory: SettingsCategory = .theme
+    @State private var selectedCategory: SettingsCategory = .general
 
     public init(
         model: Binding<GhosttySettingsModel>,
@@ -171,7 +177,7 @@ public struct GhosttySettingsView: View {
                     .font(.system(size: 13))
                     .frame(width: 20)
                     .foregroundStyle(isSelected ? .white : .secondary)
-                Text(category.rawValue)
+                Text(category.localizedName)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? .white : .primary)
                 Spacer()
@@ -191,7 +197,7 @@ public struct GhosttySettingsView: View {
     private var contentArea: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            Text(selectedCategory.rawValue)
+            Text(selectedCategory.localizedName)
                 .font(.title2.weight(.semibold))
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
@@ -201,6 +207,7 @@ public struct GhosttySettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     switch selectedCategory {
+                    case .general: GeneralSettingsContent()
                     case .theme: ThemeSettingsContent(model: $model, availableThemes: availableThemes, onChanged: onChanged)
                     case .fonts: FontSettingsContent(model: $model, onChanged: onChanged)
                     case .cursor: CursorSettingsContent(model: $model, onChanged: onChanged)
@@ -367,6 +374,46 @@ private struct TerminalPreview: View {
     }
 }
 
+// MARK: - General Settings
+
+private struct GeneralSettingsContent: View {
+    private static let supportedLanguages: [(name: String, locale: String)] = [
+        ("English", "en"),
+        ("简体中文", "zh-Hans"),
+    ]
+
+    @State private var selectedLocale: String = {
+        let lang = String.moriLanguage
+        return lang.lowercased().hasPrefix("zh") ? "zh-Hans" : "en"
+    }()
+
+    var body: some View {
+        SettingsCard {
+            SettingRow(
+                title: .localized("Language"),
+                description: .localized("Choose the display language for Mori.")
+            ) {
+                Picker("", selection: $selectedLocale) {
+                    ForEach(Self.supportedLanguages, id: \.locale) { language in
+                        Text(language.name).tag(language.locale)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 160)
+                .onChange(of: selectedLocale) { _, newValue in
+                    String.setMoriLanguage(newValue)
+                }
+            }
+
+            CardDivider()
+
+            Text(String.localized("Restart Mori to apply language change."))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 // MARK: - Theme Settings
 
 private struct ThemeSettingsContent: View {
@@ -388,10 +435,10 @@ private struct ThemeSettingsContent: View {
         // Theme settings card
         SettingsCard {
             SettingRow(
-                title: "Color theme",
-                description: "Select a color scheme for the terminal."
+                title: .localized("Color theme"),
+                description: .localized("Select a color scheme for the terminal.")
             ) {
-                Text(model.theme.isEmpty ? "Default" : model.theme)
+                Text(model.theme.isEmpty ? .localized("Default") : model.theme)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(width: 160, alignment: .trailing)
@@ -439,8 +486,8 @@ private struct ThemeSettingsContent: View {
             CardDivider()
 
             SettingRow(
-                title: "Background opacity",
-                description: "Translucent background behind the terminal content."
+                title: .localized("Background opacity"),
+                description: .localized("Translucent background behind the terminal content.")
             ) {
                 HStack(spacing: 8) {
                     Text(String(format: "%.2f", model.backgroundOpacity))
@@ -504,8 +551,8 @@ private struct FontSettingsContent: View {
 
         SettingsCard {
             SettingRow(
-                title: "Font family",
-                description: "The font to use for terminal text. Leave empty for the default."
+                title: .localized("Font family"),
+                description: .localized("The font to use for terminal text. Leave empty for the default.")
             ) {
                 TextField("SF Mono", text: $model.fontFamily)
                     .textFieldStyle(.roundedBorder)
@@ -517,8 +564,8 @@ private struct FontSettingsContent: View {
             CardDivider()
 
             SettingRow(
-                title: "Font size",
-                description: "Size in points for terminal text."
+                title: .localized("Font size"),
+                description: .localized("Size in points for terminal text.")
             ) {
                 HStack(spacing: 8) {
                     Text("\(model.fontSize) pt")
@@ -631,8 +678,8 @@ private struct CursorSettingsContent: View {
 
         SettingsCard {
             SettingRow(
-                title: "Cursor style",
-                description: "The shape of the cursor in the terminal."
+                title: .localized("Cursor style"),
+                description: .localized("The shape of the cursor in the terminal.")
             ) {
                 Picker("", selection: $model.cursorStyle) {
                     Text("Block").tag("block")
@@ -648,8 +695,8 @@ private struct CursorSettingsContent: View {
             CardDivider()
 
             SettingRow(
-                title: "Cursor blink",
-                description: "Whether the cursor blinks when idle."
+                title: .localized("Cursor blink"),
+                description: .localized("Whether the cursor blinks when idle.")
             ) {
                 Toggle("", isOn: $model.cursorBlink)
                     .labelsHidden()
@@ -692,8 +739,8 @@ private struct KeyboardSettingsContent: View {
     var body: some View {
         SettingsCard {
             SettingRow(
-                title: "Option as Alt",
-                description: "Treat the macOS Option key as Alt for terminal escape sequences."
+                title: .localized("Option as Alt"),
+                description: .localized("Treat the macOS Option key as Alt for terminal escape sequences.")
             ) {
                 Picker("", selection: $model.macosOptionAsAlt) {
                     Text("Off").tag("false")
@@ -743,21 +790,21 @@ private struct KeyboardSettingsContent: View {
                 LazyVStack(spacing: 0) {
                     // User overrides first
                     if !filteredUserBinds.isEmpty {
-                        keybindSectionHeader("User Overrides", count: filteredUserBinds.count)
+                        keybindSectionHeader(.localized("User Overrides"), count: filteredUserBinds.count)
                         ForEach(Array(filteredUserBinds.enumerated()), id: \.offset) { index, entry in
                             userKeybindRow(entry, index: index)
                         }
                     }
 
                     // Mori app shortcuts
-                    keybindSectionHeader("Mori App", count: filteredMoriBinds.count)
+                    keybindSectionHeader(.localized("Mori App"), count: filteredMoriBinds.count)
                     ForEach(filteredMoriBinds) { entry in
                         keybindRow(entry)
                     }
 
                     // Ghostty defaults
                     if !filteredGhosttyBinds.isEmpty {
-                        keybindSectionHeader("Ghostty Defaults", count: filteredGhosttyBinds.count)
+                        keybindSectionHeader(.localized("Ghostty Defaults"), count: filteredGhosttyBinds.count)
                         ForEach(filteredGhosttyBinds) { entry in
                             keybindRow(entry)
                         }
@@ -874,29 +921,29 @@ private struct KeyboardSettingsContent: View {
     // MARK: - Data
 
     private static let moriKeybinds: [KeybindEntry] = [
-        KeybindEntry(id: "m.new-tab", keys: "⌘T", action: "New Tab", source: .mori),
-        KeybindEntry(id: "m.close-tab", keys: "⌘W", action: "Close Tab", source: .mori),
-        KeybindEntry(id: "m.close-window", keys: "⇧⌘W", action: "Close Window", source: .mori),
-        KeybindEntry(id: "m.next-tab", keys: "⇧⌘]", action: "Next Tab", source: .mori),
-        KeybindEntry(id: "m.prev-tab", keys: "⇧⌘[", action: "Previous Tab", source: .mori),
-        KeybindEntry(id: "m.tab-1-8", keys: "⌘1–8", action: "Go to Tab N", source: .mori),
-        KeybindEntry(id: "m.tab-9", keys: "⌘9", action: "Last Tab", source: .mori),
-        KeybindEntry(id: "m.split-right", keys: "⌘D", action: "Split Right", source: .mori),
-        KeybindEntry(id: "m.split-down", keys: "⇧⌘D", action: "Split Down", source: .mori),
-        KeybindEntry(id: "m.next-pane", keys: "⌘]", action: "Next Pane", source: .mori),
-        KeybindEntry(id: "m.prev-pane", keys: "⌘[", action: "Previous Pane", source: .mori),
-        KeybindEntry(id: "m.pane-nav", keys: "⌥⌘↑↓←→", action: "Directional Pane Nav", source: .mori),
-        KeybindEntry(id: "m.pane-resize", keys: "⌃⌘↑↓←→", action: "Resize Pane", source: .mori),
-        KeybindEntry(id: "m.equalize", keys: "⌃⌘=", action: "Equalize Panes", source: .mori),
-        KeybindEntry(id: "m.zoom-pane", keys: "⇧⌘↩", action: "Toggle Pane Zoom", source: .mori),
-        KeybindEntry(id: "m.cycle-wt", keys: "⌃Tab", action: "Next Worktree", source: .mori),
-        KeybindEntry(id: "m.cycle-wt-rev", keys: "⌃⇧Tab", action: "Previous Worktree", source: .mori),
-        KeybindEntry(id: "m.palette", keys: "⇧⌘P", action: "Command Palette", source: .mori),
-        KeybindEntry(id: "m.lazygit", keys: "⌘G", action: "Open Lazygit", source: .mori),
-        KeybindEntry(id: "m.yazi", keys: "⌘E", action: "Open Yazi", source: .mori),
-        KeybindEntry(id: "m.settings", keys: "⌘,", action: "Settings", source: .mori),
-        KeybindEntry(id: "m.sidebar", keys: "⌘0", action: "Toggle Sidebar", source: .mori),
-        KeybindEntry(id: "m.open-proj", keys: "⇧⌘O", action: "Open Project", source: .mori),
+        KeybindEntry(id: "m.new-tab", keys: "⌘T", action: .localized("New Tab"), source: .mori),
+        KeybindEntry(id: "m.close-tab", keys: "⌘W", action: .localized("Close Tab"), source: .mori),
+        KeybindEntry(id: "m.close-window", keys: "⇧⌘W", action: .localized("Close Window"), source: .mori),
+        KeybindEntry(id: "m.next-tab", keys: "⇧⌘]", action: .localized("Next Tab"), source: .mori),
+        KeybindEntry(id: "m.prev-tab", keys: "⇧⌘[", action: .localized("Previous Tab"), source: .mori),
+        KeybindEntry(id: "m.tab-1-8", keys: "⌘1–8", action: .localized("Go to Tab N"), source: .mori),
+        KeybindEntry(id: "m.tab-9", keys: "⌘9", action: .localized("Last Tab"), source: .mori),
+        KeybindEntry(id: "m.split-right", keys: "⌘D", action: .localized("Split Right"), source: .mori),
+        KeybindEntry(id: "m.split-down", keys: "⇧⌘D", action: .localized("Split Down"), source: .mori),
+        KeybindEntry(id: "m.next-pane", keys: "⌘]", action: .localized("Next Pane"), source: .mori),
+        KeybindEntry(id: "m.prev-pane", keys: "⌘[", action: .localized("Previous Pane"), source: .mori),
+        KeybindEntry(id: "m.pane-nav", keys: "⌥⌘↑↓←→", action: .localized("Directional Pane Nav"), source: .mori),
+        KeybindEntry(id: "m.pane-resize", keys: "⌃⌘↑↓←→", action: .localized("Resize Pane"), source: .mori),
+        KeybindEntry(id: "m.equalize", keys: "⌃⌘=", action: .localized("Equalize Panes"), source: .mori),
+        KeybindEntry(id: "m.zoom-pane", keys: "⇧⌘↩", action: .localized("Toggle Pane Zoom"), source: .mori),
+        KeybindEntry(id: "m.cycle-wt", keys: "⌃Tab", action: .localized("Next Worktree"), source: .mori),
+        KeybindEntry(id: "m.cycle-wt-rev", keys: "⌃⇧Tab", action: .localized("Previous Worktree"), source: .mori),
+        KeybindEntry(id: "m.palette", keys: "⇧⌘P", action: .localized("Command Palette"), source: .mori),
+        KeybindEntry(id: "m.lazygit", keys: "⌘G", action: .localized("Open Lazygit"), source: .mori),
+        KeybindEntry(id: "m.yazi", keys: "⌘E", action: .localized("Open Yazi"), source: .mori),
+        KeybindEntry(id: "m.settings", keys: "⌘,", action: .localized("Settings"), source: .mori),
+        KeybindEntry(id: "m.sidebar", keys: "⌘0", action: .localized("Toggle Sidebar"), source: .mori),
+        KeybindEntry(id: "m.open-proj", keys: "⇧⌘O", action: .localized("Open Project"), source: .mori),
     ]
 
     private var ghosttyEntries: [KeybindEntry] {
@@ -947,8 +994,8 @@ private struct MouseSettingsContent: View {
     var body: some View {
         SettingsCard {
             SettingRow(
-                title: "Hide while typing",
-                description: "Automatically hide the mouse cursor when typing in the terminal."
+                title: .localized("Hide while typing"),
+                description: .localized("Automatically hide the mouse cursor when typing in the terminal.")
             ) {
                 Toggle("", isOn: $model.mouseHideWhileTyping)
                     .labelsHidden()
@@ -958,8 +1005,8 @@ private struct MouseSettingsContent: View {
             CardDivider()
 
             SettingRow(
-                title: "Scroll multiplier",
-                description: "Multiplier for mouse scroll speed."
+                title: .localized("Scroll multiplier"),
+                description: .localized("Multiplier for mouse scroll speed.")
             ) {
                 HStack(spacing: 8) {
                     Text("\(model.mouseScrollMultiplier)x")
@@ -975,8 +1022,8 @@ private struct MouseSettingsContent: View {
             CardDivider()
 
             SettingRow(
-                title: "Copy on select",
-                description: "Automatically copy selected text to the clipboard."
+                title: .localized("Copy on select"),
+                description: .localized("Automatically copy selected text to the clipboard.")
             ) {
                 Picker("", selection: $model.copyOnSelect) {
                     Text("Off").tag("false")
@@ -1001,8 +1048,8 @@ private struct WindowSettingsContent: View {
     var body: some View {
         SettingsCard {
             SettingRow(
-                title: "Balance window padding",
-                description: "Distribute extra padding evenly around the terminal content to center it within the window."
+                title: .localized("Balance window padding"),
+                description: .localized("Distribute extra padding evenly around the terminal content to center it within the window.")
             ) {
                 Toggle("", isOn: $model.windowPaddingBalance)
                     .labelsHidden()
@@ -1025,23 +1072,23 @@ private struct AgentHookSettingsContent: View {
             .fixedSize(horizontal: false, vertical: true)
 
         agentCard(
-            name: "Claude Code",
+            name: .localized("Claude Code"),
             icon: "terminal",
-            description: "Adds hooks to ~/.claude/settings.json for prompt submit, tool use, stop, and notification events.",
+            description: .localized("Adds hooks to ~/.claude/settings.json for prompt submit, tool use, stop, and notification events."),
             isEnabled: $model.claudeEnabled
         )
 
         agentCard(
-            name: "Codex CLI",
+            name: .localized("Codex CLI"),
             icon: "chevron.left.forwardslash.chevron.right",
-            description: "Adds a notify entry to ~/.codex/config.toml for agent turn completion events.",
+            description: .localized("Adds a notify entry to ~/.codex/config.toml for agent turn completion events."),
             isEnabled: $model.codexEnabled
         )
 
         agentCard(
-            name: "Pi",
+            name: .localized("Pi"),
             icon: "sparkle",
-            description: "Registers an extension in Pi's settings.json for agent start, end, and tool execution events.",
+            description: .localized("Registers an extension in Pi's settings.json for agent start, end, and tool execution events."),
             isEnabled: $model.piEnabled
         )
     }

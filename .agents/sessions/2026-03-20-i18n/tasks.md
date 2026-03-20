@@ -14,29 +14,37 @@
 
 ## Phase 2: App Target String Wrapping (Representative Subset)
 
-- [ ] 2.1 — Wrap menu item strings in `AppDelegate.swift` with `.localized()` (~30 strings)
-- [ ] 2.2 — Wrap alert/dialog strings in `WorkspaceManager.swift` (~10 strings)
-- [ ] 2.3 — Wrap notification strings in `NotificationManager.swift` (~5 strings)
-- [ ] 2.4 — Wrap empty state/error strings in `TerminalAreaViewController.swift` (~5 strings)
-- [ ] 2.5 — Wrap command palette strings in `CommandPaletteDataSource.swift` and `CommandPaletteController.swift` (~10 strings)
-- [ ] 2.6 — Add all wrapped strings with `zh-Hans` translations to `Sources/Mori/Resources/Localizable.xcstrings`
-- [ ] 2.7 — Build and verify strings compile correctly
+- [x] 2.1 — Wrap menu item strings in `AppDelegate.swift` with `.localized()` (~30 strings)
+- [x] 2.2 — Wrap alert/dialog strings in `WorkspaceManager.swift` (~10 strings)
+- [x] 2.3 — Wrap notification strings in `NotificationManager.swift` (~5 strings)
+- [x] 2.4 — Wrap empty state/error strings in `TerminalAreaViewController.swift` (~5 strings)
+- [x] 2.5 — Wrap command palette strings in `CommandPaletteDataSource.swift` and `CommandPaletteController.swift` (~10 strings)
+- [x] 2.6 — Add all wrapped strings with `zh-Hans` translations to `Sources/Mori/Resources/Localizable.xcstrings`
+- [x] 2.7 — Build and verify strings compile correctly
 
 ## Phase 3: MoriUI String Wrapping (Representative Subset)
 
-- [ ] 3.1 — Add `localizedName` to `SettingsCategory` enum, replace `Text(category.rawValue)` with `Text(category.localizedName)` (~8 strings)
-- [ ] 3.2 — Wrap section headers and non-literal settings labels in `GhosttySettingsView.swift` (~10 strings)
-- [ ] 3.3 — Wrap sidebar labels/help text in `ProjectRailView.swift`, `WorktreeSidebarView.swift` (~10 strings)
-- [ ] 3.4 — Wrap status/badge labels in `WorktreeRowView.swift`, `WindowRowView.swift` (~10 strings)
-- [ ] 3.5 — Add all wrapped strings with `zh-Hans` translations to MoriUI's `Localizable.xcstrings`
-- [ ] 3.6 — Build and verify strings compile correctly
+- [x] 3.1 — Add `localizedName` to `SettingsCategory` enum, replace `Text(category.rawValue)` with `Text(category.localizedName)` (~8 strings)
+- [x] 3.2 — Wrap section headers and non-literal settings labels in `GhosttySettingsView.swift` (~10 strings)
+- [x] 3.3 — Wrap sidebar labels/help text in `ProjectRailView.swift`, `WorktreeSidebarView.swift` (~10 strings)
+- [x] 3.4 — Wrap status/badge labels in `WorktreeRowView.swift`, `WindowRowView.swift` (~10 strings)
+- [x] 3.5 — Add all wrapped strings with `zh-Hans` translations to MoriUI's `Localizable.xcstrings`
+- [x] 3.6 — Build and verify strings compile correctly
 
 ## Phase 4: CLI + Docs + CLAUDE.md
 
-- [ ] 4.1 — Wrap CLI strings in `MoriCLI.swift` with `String(localized:bundle:.module)` (~15 strings)
-- [ ] 4.2 — Add `zh-Hans` translations in MoriCLI's `Localizable.xcstrings`
-- [ ] 4.3 — Rename `README.zh.md` → `README.zh-Hans.md`, update link in `README.md`
-- [ ] 4.4 — Create stub Chinese doc files: `docs/keymaps.zh-Hans.md`, `docs/agent-hooks.zh-Hans.md`, `CHANGELOG.zh-Hans.md`
-- [ ] 4.5 — Update CLAUDE.md with i18n conventions section
-- [ ] 4.6 — Run full test suite (`mise run test`)
-- [ ] 4.7 — Build smoke test: verify app launches under zh-Hans locale
+- [x] 4.1 — Wrap CLI strings in `MoriCLI.swift` with `String(localized:bundle:.module)` (~15 strings)
+- [x] 4.2 — Add `zh-Hans` translations in MoriCLI's `Localizable.xcstrings`
+- [x] 4.3 — Rename `README.zh.md` → `README.zh-Hans.md`, update link in `README.md`
+- [x] 4.4 — Create stub Chinese doc files: `docs/keymaps.zh-Hans.md`, `docs/agent-hooks.zh-Hans.md`, `CHANGELOG.zh-Hans.md`
+- [x] 4.5 — Update CLAUDE.md with i18n conventions section
+- [x] 4.6 — Run full test suite (`mise run test`)
+- [x] 4.7 — Build smoke test: verify app launches under zh-Hans locale
+
+## Phase 5: In-App Language Switcher
+
+- [x] 5.1 — Add `.general` case to `SettingsCategory` enum (first item, gearshape icon, localized name)
+- [x] 5.2 — Create `GeneralSettingsContent` view with language `Picker` + restart prompt
+- [x] 5.3 — Add `.general` case to `contentArea` switch in `GhosttySettingsView`
+- [x] 5.4 — Add zh-Hans translations for new strings to MoriUI's `Localizable.xcstrings`
+- [x] 5.5 — Build and verify (`mise run build`)
