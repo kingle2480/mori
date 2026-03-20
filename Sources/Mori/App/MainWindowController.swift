@@ -27,10 +27,7 @@ final class MainWindowController: NSWindowController {
         window.titlebarAppearsTransparent = true
         window.backgroundColor = themeInfo.background
         window.appearance = NSAppearance(named: themeInfo.isDark ? .darkAqua : .aqua)
-        window.setFrameAutosaveName("MoriMainWindow")
-        if !window.setFrameUsingName("MoriMainWindow") {
-            window.center()
-        }
+        window.center()
 
         super.init(window: window)
 
@@ -43,6 +40,22 @@ final class MainWindowController: NSWindowController {
     }
 
     // MARK: - Public
+
+    private static let frameKey = "MoriMainWindowFrame"
+
+    func restoreSavedFrame() {
+        guard let window,
+              let frameString = UserDefaults.standard.string(forKey: Self.frameKey) else { return }
+        let frame = NSRectFromString(frameString)
+        guard !frame.isEmpty else { return }
+        window.setFrame(frame, display: false)
+    }
+
+    func saveFrame() {
+        guard let window else { return }
+        let frameString = NSStringFromRect(window.frame)
+        UserDefaults.standard.set(frameString, forKey: Self.frameKey)
+    }
 
     func updateTitle(projectName: String?, worktreeName: String? = nil) {
         var parts: [String] = []

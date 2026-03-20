@@ -173,6 +173,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         windowController.contentViewController = splitVC
         windowController.showWindow(nil)
+        // Restore saved frame after all layout is complete
+        windowController.restoreSavedFrame()
         NSApp.activate(ignoringOtherApps: true)
 
         // Wire terminal switch: when worktree selection changes, attach terminal
@@ -226,6 +228,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Save window frame before teardown
+        mainWindowController?.saveFrame()
+
         // Remove key monitor
         if let monitor = keyMonitor {
             NSEvent.removeMonitor(monitor)
