@@ -894,11 +894,17 @@ final class WorkspaceManager {
             let changed = wt.hasUncommittedChanges != status.isDirty
                 || wt.aheadCount != status.ahead
                 || wt.behindCount != status.behind
+                || wt.stagedCount != status.stagedCount
+                || wt.modifiedCount != status.modifiedCount
+                || wt.untrackedCount != status.untrackedCount
 
             if changed {
                 appState.worktrees[i].hasUncommittedChanges = status.isDirty
                 appState.worktrees[i].aheadCount = status.ahead
                 appState.worktrees[i].behindCount = status.behind
+                appState.worktrees[i].stagedCount = status.stagedCount
+                appState.worktrees[i].modifiedCount = status.modifiedCount
+                appState.worktrees[i].untrackedCount = status.untrackedCount
                 // Persist to DB
                 try? worktreeRepo.save(appState.worktrees[i])
             }
