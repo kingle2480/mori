@@ -1,71 +1,154 @@
 import AppKit
 
-final class RootSplitViewController: NSSplitViewController {
-
-    // MARK: - Child controllers
+@MainActor
+final class RootSplitViewController: NSViewController {
 
     private(set) var sidebarController: NSViewController
     private(set) var contentController: NSViewController
 
-    // MARK: - Init
+    private static let widthKey = "MoriSidebarWidth"
+    private static let minWidth: CGFloat = 180
+    private static let maxWidth: CGFloat = 400
+    private static let hitWidth: CGFloat = 8
 
-    init(
-        sidebarController: NSViewController,
-        contentController: NSViewController
-    ) {
+    private let sidebarContainer = NSView()
+    private let dividerView = NSView()
+    private let contentContainer = NSView()
+    private var sidebarWidth: CGFloat = 240
+    private var isDragging = false
+    private var collapsed = false
+
+    init(sidebarController: NSViewController, contentController: NSViewController) {
         self.sidebarController = sidebarController
         self.contentController = contentController
         super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError() }
 
     // MARK: - Lifecycle
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    override func loadView() {
+        let root = NSView()
+        root.wantsLayer = true
+        dividerView.wantsLayer = true
+        dividerView.layer?.backgroundColor = NSColor.separatorColor.cgColor
 
-        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarController)
-        sidebarItem.minimumThickness = 200
-        sidebarItem.canCollapse = true
-        sidebarItem.holdingPriority = .defaultHigh
+        for v in [sidebarContainer, dividerView, contentContainer] {
+            root.addSubview(v)
+        }
+        self.view = root
 
-        let contentItem = NSSplitViewItem(viewController: contentController)
-        contentItem.minimumThickness = 400
+        embed(sidebarController, in: sidebarContainer)
+        embed(contentController, in: contentContainer)
 
-        addSplitViewItem(sidebarItem)
-        addSplitViewItem(contentItem)
-
-        splitView.dividerStyle = .thin
+        let saved = UserDefaults.standard.double(forKey: Self.widthKey)
+        if saved > 0 { sidebarWidth = saved.clamped(to: Self.minWidth, Self.maxWidth) }
     }
 
-    // MARK: - Sidebar Toggle
-
-    var isSidebarCollapsed: Bool {
-        !splitViewItems.isEmpty && splitViewItems[0].isCollapsed
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        updateLayout()
     }
 
-    func toggleSidebar() {
-        guard !splitViewItems.isEmpty else { return }
-        let collapsed = splitViewItems[0].isCollapsed
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            splitViewItems[0].animator().isCollapsed = !collapsed
+    // MARK: - Layout
+
+    private func updateLayout() {
+        let b = view.bounds
+        let sw: CGFloat = collapsed ? 0 : sidebarWidth
+        let dw: CGFloat = collapsed ? 0 : 1
+
+        sidebarContainer.frame = NSRect(x: 0, y: 0, width: sw, height: b.height)
+        dividerView.frame = NSRect(x: sw, y: 0, width: dw, height: b.height)
+        contentContainer.frame = NSRect(x: sw + dw, y: 0, width: b.width - sw - dw, height: b.height)
+        sidebarContainer.isHidden = collapsed
+        dividerView.isHidden = collapsed
+
+        view.discardCursorRects()
+        if !collapsed {
+            let center = sw + dw / 2
+            let rect = NSRect(x: center - Self.hitWidth / 2, y: 0, width: Self.hitWidth, height: b.height)
+            view.addCursorRect(rect, cursor: .resizeLeftRight)
         }
     }
 
-    // MARK: - Public helpers
+    // MARK: - Divider drag
+
+    private func hitDivider(_ event: NSEvent) -> Bool {
+        guard !collapsed else { return false }
+        let x = view.convert(event.locationInWindow, from: nil).x
+        return abs(x - sidebarWidth) <= Self.hitWidth / 2
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if hitDivider(event) { isDragging = true; NSCursor.resizeLeftRight.push() }
+        else { super.mouseDown(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isDragging else { super.mouseDragged(with: event); return }
+        sidebarWidth = view.convert(event.locationInWindow, from: nil).x
+            .clamped(to: Self.minWidth, Self.maxWidth)
+        updateLayout()
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard isDragging else { super.mouseUp(with: event); return }
+        isDragging = false
+        NSCursor.pop()
+        saveSidebarWidth()
+    }
+
+    // MARK: - Public
+
+    var isSidebarCollapsed: Bool { collapsed }
+
+    func toggleSidebar() {
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.2
+            ctx.allowsImplicitAnimation = true
+            collapsed.toggle()
+            updateLayout()
+        }
+    }
+
+    func saveSidebarWidth() {
+        guard !collapsed, sidebarWidth > 0 else { return }
+        UserDefaults.standard.set(Double(sidebarWidth), forKey: Self.widthKey)
+    }
 
     func replaceContentController(with controller: NSViewController) {
-        let index = 1
-        removeSplitViewItem(splitViewItems[index])
-
+        contentController.view.removeFromSuperview()
+        contentController.removeFromParent()
         contentController = controller
-        let newItem = NSSplitViewItem(viewController: controller)
-        newItem.minimumThickness = 400
-        insertSplitViewItem(newItem, at: index)
+        embed(controller, in: contentContainer)
+        updateLayout()
+    }
+
+    // MARK: - Helpers
+
+    private func embed(_ vc: NSViewController, in container: NSView) {
+        addChild(vc)
+        vc.view.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(vc.view)
+        NSLayoutConstraint.activate([
+            vc.view.topAnchor.constraint(equalTo: container.topAnchor),
+            vc.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            vc.view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            vc.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+    }
+}
+
+private extension CGFloat {
+    func clamped(to minVal: CGFloat, _ maxVal: CGFloat) -> CGFloat {
+        Swift.min(Swift.max(self, minVal), maxVal)
+    }
+}
+
+private extension Double {
+    func clamped(to minVal: CGFloat, _ maxVal: CGFloat) -> CGFloat {
+        CGFloat(self).clamped(to: minVal, maxVal)
     }
 }

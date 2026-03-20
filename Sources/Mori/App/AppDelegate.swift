@@ -228,8 +228,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Save window frame before teardown
+        // Save window frame and sidebar width before teardown
         mainWindowController?.saveFrame()
+        rootSplitVC?.saveSidebarWidth()
 
         // Remove key monitor
         if let monitor = keyMonitor {

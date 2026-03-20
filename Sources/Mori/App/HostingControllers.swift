@@ -42,6 +42,10 @@ final class SidebarHostingController: NSHostingController<SidebarContentView> {
             onOpenCommandPalette: onOpenCommandPalette
         )
         super.init(rootView: rootView)
+        // Prevent SwiftUI's layout from dictating the view size.
+        // Without this, the hosting controller sets a preferred content size
+        // that locks the split view sidebar to a fixed width.
+        sizingOptions = []
     }
 
     @available(*, unavailable)
