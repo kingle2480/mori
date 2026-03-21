@@ -1,11 +1,10 @@
 import SwiftUI
 import MoriCore
 
-/// A row representing a worktree in task mode: branch name + project badge + git status + alert badge.
-/// Similar to `WorktreeRowView` but includes a project short-name badge for cross-project context.
+/// A row representing a worktree in task mode: worktree name + project name + git status + alert badge.
 public struct TaskWorktreeRowView: View {
     let worktree: Worktree
-    let projectShortName: String
+    let projectName: String
     let isSelected: Bool
     let onSelect: () -> Void
 
@@ -13,12 +12,12 @@ public struct TaskWorktreeRowView: View {
 
     public init(
         worktree: Worktree,
-        projectShortName: String,
+        projectName: String,
         isSelected: Bool,
         onSelect: @escaping () -> Void
     ) {
         self.worktree = worktree
-        self.projectShortName = projectShortName
+        self.projectName = projectName
         self.isSelected = isSelected
         self.onSelect = onSelect
     }
@@ -32,7 +31,7 @@ public struct TaskWorktreeRowView: View {
 
                 VStack(alignment: .leading, spacing: MoriTokens.Spacing.xxs) {
                     HStack(spacing: MoriTokens.Spacing.sm) {
-                        Text(worktree.branch ?? worktree.name)
+                        Text(worktree.name)
                             .font(.system(.body, weight: .semibold))
                             .lineLimit(1)
 
@@ -40,7 +39,10 @@ public struct TaskWorktreeRowView: View {
                     }
 
                     HStack(spacing: MoriTokens.Spacing.sm) {
-                        projectBadge
+                        Text(projectName)
+                            .font(MoriTokens.Font.caption)
+                            .foregroundStyle(MoriTokens.Color.muted)
+                            .lineLimit(1)
 
                         if worktree.status == .active {
                             Circle()
@@ -74,18 +76,6 @@ public struct TaskWorktreeRowView: View {
                 isHovered = hovering
             }
         }
-    }
-
-    // MARK: - Project Badge
-
-    private var projectBadge: some View {
-        Text(projectShortName)
-            .font(MoriTokens.Font.caption)
-            .foregroundStyle(MoriTokens.Color.muted)
-            .padding(.horizontal, MoriTokens.Spacing.sm)
-            .padding(.vertical, MoriTokens.Spacing.xxs)
-            .background(MoriTokens.Color.muted.opacity(MoriTokens.Opacity.subtle))
-            .clipShape(RoundedRectangle(cornerRadius: MoriTokens.Radius.small))
     }
 
     // MARK: - Row Background

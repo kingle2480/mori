@@ -54,7 +54,6 @@ public struct TaskSidebarView: View {
         self.onOpenCommandPalette = onOpenCommandPalette
     }
 
-    /// Worktrees filtered to exclude unavailable, keyed by project ID for lookup.
     private var projectMap: [UUID: Project] {
         Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0) })
     }
@@ -66,7 +65,6 @@ public struct TaskSidebarView: View {
     private func worktreesForStatus(_ status: WorkflowStatus) -> [Worktree] {
         availableWorktrees
             .filter { $0.workflowStatus == status }
-            .sorted { ($0.lastActiveAt ?? .distantPast) > ($1.lastActiveAt ?? .distantPast) }
     }
 
     public var body: some View {
@@ -175,12 +173,12 @@ public struct TaskSidebarView: View {
         let worktreeWindows = windows
             .filter { $0.worktreeId == worktree.id }
             .sorted { $0.tmuxWindowIndex < $1.tmuxWindowIndex }
-        let shortName = projectMap[worktree.projectId]?.shortName ?? "?"
+        let projectName = projectMap[worktree.projectId]?.name ?? ""
 
         VStack(alignment: .leading, spacing: 0) {
             TaskWorktreeRowView(
                 worktree: worktree,
-                projectShortName: shortName,
+                projectName: projectName,
                 isSelected: isSelected,
                 onSelect: { onSelectWorktree(worktree.id) }
             )
