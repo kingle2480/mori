@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var sidebarController: SidebarHostingController?
     private var ipcServer: IPCServer?
     private var ipcHandler: IPCHandler?
+    private var worktreeCreationController: WorktreeCreationController?
     private var settingsWindowController: NSWindowController?
     private var configFile: GhosttyConfigFile?
 
@@ -114,11 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 manager?.selectWindow(windowId)
                 self?.updateWindowTitle()
             },
-            onCreateWorktree: { [weak manager] branchName in
-                guard let manager else { return }
-                Task { @MainActor in
-                    await manager.handleCreateWorktree(branchName: branchName)
-                }
+            onShowCreatePanel: { [weak self] in
+                self?.showCreateWorktreePanel()
             },
             onRemoveWorktree: { [weak manager] worktreeId in
                 guard let manager else { return }
@@ -163,6 +161,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         windowController.onToggleSidebar = { [weak splitVC] in
             splitVC?.toggleSidebar()
+        }
+
+        windowController.onShowCreateWorktreePanel = { [weak self] in
+            self?.showCreateWorktreePanel()
         }
 
         windowController.contentViewController = splitVC
@@ -287,6 +289,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 alert.runModal()
             }
         }
+    }
+
+    // MARK: - Create Worktree Panel
+
+    private func showCreateWorktreePanel() {
+        guard let manager = workspaceManager, let state = appState else { return }
+
+        guard let projectId = state.uiState.selectedProjectId,
+              let project = state.projects.first(where: { $0.id == projectId }) else {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = .localized("No Project Selected")
+            alert.informativeText = .localized("Please select a project first.")
+            alert.addButton(withTitle: .localized("OK"))
+            alert.runModal()
+            return
+        }
+
+        if worktreeCreationController == nil {
+            let controller = WorktreeCreationController()
+
+            controller.fetchBranches = { [weak manager] repoPath in
+                guard let manager else { return [] }
+                return try await manager.gitBackend.listBranches(repoPath: repoPath)
+            }
+
+            controller.onCreateWorktree = { [weak manager] request in
+                guard let manager else { return }
+                Task { @MainActor in
+                    await manager.handleCreateWorktreeFromPanel(request)
+                }
+            }
+
+            controller.onProjectChanged = { [weak self] newProjectId in
+                guard let self else { return }
+                self.appState?.uiState.selectedProjectId = newProjectId
+                self.workspaceManager?.selectProject(newProjectId)
+                self.refreshCreateWorktreePanel(for: newProjectId)
+            }
+
+            worktreeCreationController = controller
+        }
+
+        let controller = worktreeCreationController!
+
+        let themeInfo = terminalAreaController?.themeInfo ?? .fallback
+        controller.show(
+            projects: state.projects,
+            selectedProjectId: projectId,
+            repoPath: project.repoRootPath,
+            themeInfo: themeInfo
+        )
+    }
+
+    /// Lightweight refresh when the user changes the project dropdown — only
+    /// re-fetches branches for the new project without re-wiring callbacks or
+    /// re-positioning the panel.
+    private func refreshCreateWorktreePanel(for projectId: UUID) {
+        guard let controller = worktreeCreationController,
+              let state = appState,
+              let project = state.projects.first(where: { $0.id == projectId }) else { return }
+        controller.refresh(
+            projects: state.projects,
+            selectedProjectId: projectId,
+            repoPath: project.repoRootPath
+        )
     }
 
     // MARK: - Settings Window
@@ -675,6 +743,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 return nil
             }
 
+            // Cmd+Shift+N: open worktree creation panel
+            if mods == [.command, .shift], key == "N" || key == "n" {
+                self?.showCreateWorktreePanel()
+                return nil
+            }
+
             // Cmd+1–9: select tmux window (tab) by index
             if mods == [.command], let digit = Int(key), digit >= 1, digit <= 9 {
                 self?.workspaceManager?.selectWindowByIndex(digit)
@@ -775,24 +849,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func handlePaletteAction(_ actionId: String, manager: WorkspaceManager) {
         switch actionId {
         case "action.create-worktree":
-            // Prompt for branch name via a simple input dialog
-            let alert = NSAlert()
-            alert.messageText = .localized("Create Worktree")
-            alert.informativeText = .localized("Enter a branch name:")
-            alert.addButton(withTitle: .localized("Create"))
-            alert.addButton(withTitle: .localized("Cancel"))
-
-            let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-            inputField.placeholderString = "feature/my-branch"
-            alert.accessoryView = inputField
-
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                let branchName = inputField.stringValue
-                Task { @MainActor in
-                    await manager.handleCreateWorktree(branchName: branchName)
-                }
-            }
+            showCreateWorktreePanel()
 
         case "action.refresh":
             Task { @MainActor in
