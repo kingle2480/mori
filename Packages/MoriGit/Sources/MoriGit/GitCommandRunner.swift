@@ -5,11 +5,18 @@ public struct GitSSHConfig: Sendable {
     public let host: String
     public let user: String?
     public let port: Int?
+    public let sshOptions: [String]
 
-    public init(host: String, user: String? = nil, port: Int? = nil) {
+    public init(
+        host: String,
+        user: String? = nil,
+        port: Int? = nil,
+        sshOptions: [String] = []
+    ) {
         self.host = host
         self.user = user
         self.port = port
+        self.sshOptions = sshOptions
     }
 
     var target: String {
@@ -103,6 +110,7 @@ public actor GitCommandRunner {
         if let sshConfig {
             let remoteCommand = (["git"] + arguments).map(Self.shellEscape).joined(separator: " ")
             var sshArguments: [String] = ["-o", "ConnectTimeout=8"]
+            sshArguments += sshConfig.sshOptions
             if let port = sshConfig.port {
                 sshArguments += ["-p", "\(port)"]
             }

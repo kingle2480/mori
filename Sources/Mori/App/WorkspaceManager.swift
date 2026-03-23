@@ -12,8 +12,8 @@ enum WorkspaceError: Error, LocalizedError {
     case branchNameInvalid(String)
     case remoteHostEmpty
     case remotePathEmpty
-    case remotePathNotGitRepo(String)
     case remoteTmuxUnavailable(String)
+    case remotePasswordEmpty
 
     var errorDescription: String? {
         switch self {
@@ -27,10 +27,10 @@ enum WorkspaceError: Error, LocalizedError {
             return "Remote host cannot be empty."
         case .remotePathEmpty:
             return "Remote repository path cannot be empty."
-        case .remotePathNotGitRepo(let path):
-            return "\"\(path)\" is not a git repository on the remote host."
         case .remoteTmuxUnavailable(let host):
             return "tmux is not available on remote host \"\(host)\"."
+        case .remotePasswordEmpty:
+            return "Password is required for password authentication."
         }
     }
 }
@@ -177,13 +177,18 @@ final class WorkspaceManager {
         case .local:
             return tmuxBackend
         case .ssh(let ssh):
-            let key = location.endpointKey
+            let key = "ssh:\(ssh.endpointKey):\(ssh.authMethod.rawValue)"
             if let cached = remoteTmuxBackends[key] {
                 return cached
             }
             let backend = TmuxBackend(
                 runner: TmuxCommandRunner(
-                    sshConfig: TmuxSSHConfig(host: ssh.host, user: ssh.user, port: ssh.port)
+                    sshConfig: TmuxSSHConfig(
+                        host: ssh.host,
+                        user: ssh.user,
+                        port: ssh.port,
+                        sshOptions: SSHControlOptions.sshOptions(for: ssh)
+                    )
                 )
             )
             remoteTmuxBackends[key] = backend
@@ -200,13 +205,18 @@ final class WorkspaceManager {
         case .local:
             return gitBackend
         case .ssh(let ssh):
-            let key = location.endpointKey
+            let key = "ssh:\(ssh.endpointKey):\(ssh.authMethod.rawValue)"
             if let cached = remoteGitBackends[key] {
                 return cached
             }
             let backend = GitBackend(
                 runner: GitCommandRunner(
-                    sshConfig: GitSSHConfig(host: ssh.host, user: ssh.user, port: ssh.port)
+                    sshConfig: GitSSHConfig(
+                        host: ssh.host,
+                        user: ssh.user,
+                        port: ssh.port,
+                        sshOptions: SSHControlOptions.sshOptions(for: ssh)
+                    )
                 )
             )
             remoteGitBackends[key] = backend
@@ -377,18 +387,16 @@ final class WorkspaceManager {
 
     /// Add a new project from a directory path. Creates Project, default Worktree,
     /// and tmux session. Returns the new project.
-    /// Validates that the path is a git repo and resolves gitCommonDir.
+    /// Best effort: if path is a git repo, resolve gitCommonDir and branch.
+    /// Non-git paths are allowed and still create a managed tmux session.
     @discardableResult
     func addProject(path: String, location: WorkspaceLocation = .local) async throws -> Project {
         let name = (path as NSString).lastPathComponent
         let git = gitBackend(for: location)
         let tmux = tmuxBackend(for: location)
 
-        // Validate git repo and resolve gitCommonDir
+        // Best effort git detection
         let isRepo = try await git.isGitRepo(path: path)
-        if case .ssh = location, !isRepo {
-            throw WorkspaceError.remotePathNotGitRepo(path)
-        }
         var commonDir = path
         var detectedBranch = "main"
         if isRepo {
@@ -445,15 +453,33 @@ final class WorkspaceManager {
         host: String,
         path: String,
         user: String? = nil,
-        port: Int? = nil
+        port: Int? = nil,
+        authMethod: SSHAuthMethod = .publicKey,
+        password: String? = nil
     ) async throws -> Project {
         let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedHost.isEmpty else { throw WorkspaceError.remoteHostEmpty }
         guard !trimmedPath.isEmpty else { throw WorkspaceError.remotePathEmpty }
+        if authMethod == .password, (password?.isEmpty ?? true) {
+            throw WorkspaceError.remotePasswordEmpty
+        }
+
+        let sshLocation = SSHWorkspaceLocation(
+            host: trimmedHost,
+            user: user,
+            port: port,
+            authMethod: authMethod
+        )
+        if authMethod == .password {
+            try await SSHBootstrapper.bootstrapPasswordSession(
+                ssh: sshLocation,
+                password: password
+            )
+        }
 
         let location = WorkspaceLocation.ssh(
-            SSHWorkspaceLocation(host: trimmedHost, user: user, port: port)
+            sshLocation
         )
         let tmux = tmuxBackend(for: location)
         guard await tmux.isAvailable() else {

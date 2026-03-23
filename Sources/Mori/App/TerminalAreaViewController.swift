@@ -104,6 +104,9 @@ final class TerminalAreaViewController: NSViewController {
         case .ssh(let ssh):
             let remoteTmux = "tmux has-session -t \(escaped) 2>/dev/null && tmux attach-session -t \(escaped) || tmux new-session -s \(escaped)"
             var sshCommand = "ssh -tt"
+            for option in SSHControlOptions.sshOptions(for: ssh) {
+                sshCommand += " \(shellEscape(option))"
+            }
             if let port = ssh.port {
                 sshCommand += " -p \(port)"
             }

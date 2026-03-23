@@ -49,16 +49,51 @@ public enum WorkspaceLocation: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+public enum SSHAuthMethod: String, Codable, Equatable, Hashable, Sendable {
+    case publicKey
+    case password
+}
+
 /// SSH endpoint configuration for remote projects.
 public struct SSHWorkspaceLocation: Codable, Equatable, Hashable, Sendable {
+    private enum CodingKeys: String, CodingKey {
+        case host
+        case user
+        case port
+        case authMethod
+    }
+
     public var host: String
     public var user: String?
     public var port: Int?
+    public var authMethod: SSHAuthMethod
 
-    public init(host: String, user: String? = nil, port: Int? = nil) {
+    public init(
+        host: String,
+        user: String? = nil,
+        port: Int? = nil,
+        authMethod: SSHAuthMethod = .publicKey
+    ) {
         self.host = host
         self.user = user
         self.port = port
+        self.authMethod = authMethod
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.host = try container.decode(String.self, forKey: .host)
+        self.user = try container.decodeIfPresent(String.self, forKey: .user)
+        self.port = try container.decodeIfPresent(Int.self, forKey: .port)
+        self.authMethod = try container.decodeIfPresent(SSHAuthMethod.self, forKey: .authMethod) ?? .publicKey
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(host, forKey: .host)
+        try container.encodeIfPresent(user, forKey: .user)
+        try container.encodeIfPresent(port, forKey: .port)
+        try container.encode(authMethod, forKey: .authMethod)
     }
 
     /// Target value passed to `ssh` (e.g. `user@example.com`).

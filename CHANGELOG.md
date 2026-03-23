@@ -18,12 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Project now prompts `Local Folder` vs `Remote Project (SSH)`
 - Added SSH-backed remote project support so git/tmux operations can run on remote hosts while keeping Mori UI local
+- Added a VS Code-style top input wizard for remote host connection (`[user@]host[:port]`, auth mode, path)
+- Added command palette action `Remote: Connect to Host...`
+- Remote add now allows non-git directories (git integration is best-effort, tmux workflow still works)
 
 ### 🐛 Bug Fixes
 
 - `mise run build`/`build:release` now auto-bootstrap GhosttyKit via `build:ghostty` to avoid missing XCFramework errors on fresh clones
 - `scripts/build-ghostty.sh` now validates XCFramework contents and rebuilds invalid artifacts instead of treating empty directories as valid
 - `scripts/build-ghostty.sh` now auto-installs the Metal Toolchain when `xcrun metal` is unavailable
+- Settings `Open Config` now forces text-editor open and normalizes config file permissions to non-executable
+- Remote terminal attach now reuses SSH control options for more reliable remote tmux session handling
 
 ## [0.1.0] - 2026-03-20
 

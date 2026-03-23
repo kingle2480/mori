@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var settingsWindowController: NSWindowController?
     private var configFile: GhosttyConfigFile?
     private var proxyApplyTask: Task<Void, Never>?
+    private var remoteConnectWizardController: RemoteConnectWizardController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Task 3.8: Single instance check
@@ -303,7 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             case .alertFirstButtonReturn:
                 self?.showLocalProjectPanel()
             case .alertSecondButtonReturn:
-                self?.showRemoteProjectPanel()
+                self?.showRemoteConnectWizard()
             default:
                 break
             }
@@ -326,68 +327,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    private func showRemoteProjectPanel() {
-        guard let window = mainWindowController?.window else { return }
-
-        let hostField = NSTextField(string: "")
-        hostField.placeholderString = "example.com or ssh alias"
-
-        let pathField = NSTextField(string: "")
-        pathField.placeholderString = "/srv/repos/mori"
-
-        let userField = NSTextField(string: "")
-        userField.placeholderString = "(optional) username"
-
-        let portField = NSTextField(string: "")
-        portField.placeholderString = "(optional) port, e.g. 22"
-
-        let grid = NSGridView(views: [
-            [NSTextField(labelWithString: "Host"), hostField],
-            [NSTextField(labelWithString: "Path"), pathField],
-            [NSTextField(labelWithString: "User"), userField],
-            [NSTextField(labelWithString: "Port"), portField],
-        ])
-        grid.rowSpacing = 8
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 1).xPlacement = .fill
-        hostField.frame.size.width = 320
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Add Remote Project (SSH)"
-        alert.informativeText = "Connect to a remote git repository and run tmux there."
-        alert.addButton(withTitle: "Add Remote")
-        alert.addButton(withTitle: "Cancel")
-        alert.accessoryView = grid
-
-        alert.beginSheetModal(for: window) { [weak self] response in
-            guard response == .alertFirstButtonReturn else { return }
-
-            let host = hostField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let path = pathField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let userRaw = userField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let portRaw = portField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            var port: Int?
-            if !portRaw.isEmpty {
-                guard let parsed = Int(portRaw), parsed > 0 else {
-                    let errorAlert = NSAlert()
-                    errorAlert.alertStyle = .warning
-                    errorAlert.messageText = "Invalid Port"
-                    errorAlert.informativeText = "Port must be a positive integer."
-                    errorAlert.beginSheetModal(for: window)
-                    return
-                }
-                port = parsed
+    private func showRemoteConnectWizard() {
+        let wizard = RemoteConnectWizardController()
+        wizard.onSubmit = { [weak self] (input: RemoteConnectInput) async -> Result<Void, any Error> in
+            guard let self else {
+                return .failure(NSError(domain: "Mori", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "Window closed.",
+                ]))
+            }
+            guard let manager = self.workspaceManager else {
+                return .failure(NSError(domain: "Mori", code: 2, userInfo: [
+                    NSLocalizedDescriptionKey: "Workspace manager unavailable.",
+                ]))
             }
 
-            self?.handleAddRemoteProject(
-                host: host,
-                path: path,
-                user: userRaw.isEmpty ? nil : userRaw,
-                port: port
-            )
+            do {
+                let project = try await manager.addRemoteProject(
+                    host: input.host,
+                    path: input.path,
+                    user: input.user,
+                    port: input.port,
+                    authMethod: input.authMethod,
+                    password: input.password
+                )
+                self.mainWindowController?.updateTitle(projectName: project.name)
+                return .success(())
+            } catch {
+                return .failure(error)
+            }
         }
+        remoteConnectWizardController = wizard
+        wizard.present(over: mainWindowController?.window)
     }
 
     private func handleAddProject(path: String) {
@@ -471,23 +441,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             repoPath: project.repoRootPath
         )
     }
-
-    private func handleAddRemoteProject(host: String, path: String, user: String?, port: Int?) {
-        guard let manager = workspaceManager else { return }
-        Task { @MainActor in
-            do {
-                let project = try await manager.addRemoteProject(host: host, path: path, user: user, port: port)
-                mainWindowController?.updateTitle(projectName: project.name)
-            } catch {
-                let alert = NSAlert()
-                alert.alertStyle = .warning
-                alert.messageText = .localized("Failed to add remote project")
-                alert.informativeText = error.localizedDescription
-                alert.runModal()
-            }
-        }
-    }
-
     // MARK: - Settings Window
 
     private func showSettingsWindow() {
@@ -521,7 +474,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 self.reloadGhosttyConfig()
             },
             onOpenConfigFile: {
-                NSWorkspace.shared.open(URL(fileURLWithPath: GhosttyConfigFile.configPath))
+                GhosttyConfigFile.ensureConfigFileExists()
+                GhosttyConfigFile.normalizePermissions()
+                let configURL = URL(fileURLWithPath: GhosttyConfigFile.configPath)
+                if let textEditURL = NSWorkspace.shared.urlForApplication(
+                    withBundleIdentifier: "com.apple.TextEdit"
+                ) {
+                    NSWorkspace.shared.open(
+                        [configURL],
+                        withApplicationAt: textEditURL,
+                        configuration: NSWorkspace.OpenConfiguration()
+                    ) { _, _ in }
+                } else {
+                    NSWorkspace.shared.open(configURL)
+                }
             },
             onAgentHookChanged: { newModel in
                 Self.applyAgentHookChanges(newModel)
@@ -1009,6 +975,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         case "action.open-project":
             showAddProjectPanel()
+        case "action.remote-connect":
+            showRemoteConnectWizard()
 
         default:
             // Handle "action.status-<rawValue>" patterns
