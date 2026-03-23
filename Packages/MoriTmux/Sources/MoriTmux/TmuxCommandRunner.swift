@@ -6,17 +6,21 @@ public struct TmuxSSHConfig: Sendable {
     public let user: String?
     public let port: Int?
     public let sshOptions: [String]
+    /// Optional password used for password-auth control-master bootstrap.
+    public let askpassPassword: String?
 
     public init(
         host: String,
         user: String? = nil,
         port: Int? = nil,
-        sshOptions: [String] = []
+        sshOptions: [String] = [],
+        askpassPassword: String? = nil
     ) {
         self.host = host
         self.user = user
         self.port = port
         self.sshOptions = sshOptions
+        self.askpassPassword = askpassPassword
     }
 
     var target: String {
@@ -210,7 +214,9 @@ public actor TmuxCommandRunner {
     /// Run a tmux command with the given arguments array. Returns stdout as a string.
     public func run(_ arguments: [String]) async throws -> String {
         if let sshConfig {
-            let remoteCommand = (["tmux"] + arguments).map(Self.shellEscape).joined(separator: " ")
+            let tmuxCommand = (["tmux"] + arguments).map(Self.shellEscape).joined(separator: " ")
+            let remoteCommand = "export PATH=\"\\$PATH:/opt/homebrew/bin:/usr/local/bin\"; \(tmuxCommand)"
+
             var sshArguments: [String] = ["-o", "ConnectTimeout=8"]
             sshArguments += sshConfig.sshOptions
             if let port = sshConfig.port {
@@ -218,11 +224,22 @@ public actor TmuxCommandRunner {
             }
             sshArguments += [sshConfig.target, remoteCommand]
 
-            let (stdout, stderr, exitCode) = try await runProcess(
+            var (stdout, stderr, exitCode) = try await runProcess(
                 executablePath: "/usr/bin/ssh",
                 arguments: sshArguments,
                 environment: nil
             )
+
+            if exitCode == 255,
+               let password = sshConfig.askpassPassword,
+               !password.isEmpty {
+                try await bootstrapPasswordControlMaster(sshConfig: sshConfig, password: password)
+                (stdout, stderr, exitCode) = try await runProcess(
+                    executablePath: "/usr/bin/ssh",
+                    arguments: sshArguments,
+                    environment: nil
+                )
+            }
 
             if exitCode != 0 {
                 let cmd = "tmux \(arguments.joined(separator: " "))"
@@ -259,6 +276,65 @@ public actor TmuxCommandRunner {
     }
 
     // MARK: - Private
+
+    private func bootstrapPasswordControlMaster(
+        sshConfig: TmuxSSHConfig,
+        password: String
+    ) async throws {
+        let scriptPath = (NSTemporaryDirectory() as NSString).appendingPathComponent("mori-askpass-\(UUID().uuidString).sh")
+        let script = "#!/bin/sh\necho \"$MORI_SSH_PASSWORD\"\n"
+        try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptPath)
+        defer { try? FileManager.default.removeItem(atPath: scriptPath) }
+
+        var arguments: [String] = ["-o", "ConnectTimeout=8"]
+        arguments += Self.removingBatchMode(from: sshConfig.sshOptions)
+        arguments += [
+            "-o", "PreferredAuthentications=password,keyboard-interactive",
+            "-o", "PubkeyAuthentication=no",
+            "-o", "NumberOfPasswordPrompts=1",
+        ]
+        if let port = sshConfig.port {
+            arguments += ["-p", "\(port)"]
+        }
+        arguments += [sshConfig.target, "exit"]
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["SSH_ASKPASS"] = scriptPath
+        environment["SSH_ASKPASS_REQUIRE"] = "force"
+        environment["DISPLAY"] = "mori"
+        environment["MORI_SSH_PASSWORD"] = password
+
+        let (stdout, stderr, exitCode) = try await runProcess(
+            executablePath: "/usr/bin/ssh",
+            arguments: arguments,
+            environment: environment,
+            stdinNull: true
+        )
+
+        guard exitCode == 0 else {
+            let message = stderr.isEmpty ? stdout : stderr
+            throw TmuxError.executionFailed(
+                command: "ssh \(sshConfig.target) exit",
+                exitCode: exitCode,
+                stderr: message.isEmpty ? "SSH authentication failed." : message
+            )
+        }
+    }
+
+    private static func removingBatchMode(from options: [String]) -> [String] {
+        var filtered: [String] = []
+        var i = 0
+        while i < options.count {
+            if options[i] == "-o", i + 1 < options.count, options[i + 1].hasPrefix("BatchMode=") {
+                i += 2
+                continue
+            }
+            filtered.append(options[i])
+            i += 1
+        }
+        return filtered
+    }
 
     private func runProcess(
         executablePath: String,

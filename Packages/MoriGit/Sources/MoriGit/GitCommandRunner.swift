@@ -6,17 +6,21 @@ public struct GitSSHConfig: Sendable {
     public let user: String?
     public let port: Int?
     public let sshOptions: [String]
+    /// Optional password used for password-auth control-master bootstrap.
+    public let askpassPassword: String?
 
     public init(
         host: String,
         user: String? = nil,
         port: Int? = nil,
-        sshOptions: [String] = []
+        sshOptions: [String] = [],
+        askpassPassword: String? = nil
     ) {
         self.host = host
         self.user = user
         self.port = port
         self.sshOptions = sshOptions
+        self.askpassPassword = askpassPassword
     }
 
     var target: String {
@@ -116,10 +120,20 @@ public actor GitCommandRunner {
             }
             sshArguments += [sshConfig.target, remoteCommand]
 
-            let (stdout, exitCode) = try await runProcess(
+            var (stdout, exitCode) = try await runProcess(
                 executablePath: "/usr/bin/ssh",
                 arguments: sshArguments
             )
+
+            if exitCode == 255,
+               let password = sshConfig.askpassPassword,
+               !password.isEmpty {
+                try await bootstrapPasswordControlMaster(sshConfig: sshConfig, password: password)
+                (stdout, exitCode) = try await runProcess(
+                    executablePath: "/usr/bin/ssh",
+                    arguments: sshArguments
+                )
+            }
 
             if exitCode != 0 {
                 let cmd = "ssh \(sshConfig.target) \(remoteCommand)"
@@ -152,7 +166,9 @@ public actor GitCommandRunner {
 
     private func runProcess(
         executablePath: String,
-        arguments: [String]
+        arguments: [String],
+        environment: [String: String]? = nil,
+        stdinNull: Bool = false
     ) async throws -> (output: String, exitCode: Int32) {
         try await withCheckedThrowingContinuation { continuation in
             let process = Process()
@@ -161,8 +177,14 @@ public actor GitCommandRunner {
 
             process.executableURL = URL(fileURLWithPath: executablePath)
             process.arguments = arguments
+            if let environment {
+                process.environment = environment
+            }
             process.standardOutput = stdoutPipe
             process.standardError = stderrPipe
+            if stdinNull {
+                process.standardInput = FileHandle.nullDevice
+            }
 
             do {
                 try process.run()
@@ -182,6 +204,63 @@ public actor GitCommandRunner {
                 continuation.resume(returning: (output, process.terminationStatus))
             }
         }
+    }
+
+    private func bootstrapPasswordControlMaster(
+        sshConfig: GitSSHConfig,
+        password: String
+    ) async throws {
+        let scriptPath = (NSTemporaryDirectory() as NSString).appendingPathComponent("mori-askpass-\(UUID().uuidString).sh")
+        let script = "#!/bin/sh\necho \"$MORI_SSH_PASSWORD\"\n"
+        try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptPath)
+        defer { try? FileManager.default.removeItem(atPath: scriptPath) }
+
+        var args: [String] = ["-o", "ConnectTimeout=8"]
+        args += Self.removingBatchMode(from: sshConfig.sshOptions)
+        args += [
+            "-o", "PreferredAuthentications=password,keyboard-interactive",
+            "-o", "PubkeyAuthentication=no",
+            "-o", "NumberOfPasswordPrompts=1",
+        ]
+        if let port = sshConfig.port {
+            args += ["-p", "\(port)"]
+        }
+        args += [sshConfig.target, "exit"]
+
+        var env = ProcessInfo.processInfo.environment
+        env["SSH_ASKPASS"] = scriptPath
+        env["SSH_ASKPASS_REQUIRE"] = "force"
+        env["DISPLAY"] = "mori"
+        env["MORI_SSH_PASSWORD"] = password
+
+        let (output, exitCode) = try await runProcess(
+            executablePath: "/usr/bin/ssh",
+            arguments: args,
+            environment: env,
+            stdinNull: true
+        )
+        guard exitCode == 0 else {
+            throw GitError.executionFailed(
+                command: "ssh \(sshConfig.target) exit",
+                exitCode: exitCode,
+                stderr: output.isEmpty ? "SSH authentication failed." : output
+            )
+        }
+    }
+
+    private static func removingBatchMode(from options: [String]) -> [String] {
+        var filtered: [String] = []
+        var i = 0
+        while i < options.count {
+            if options[i] == "-o", i + 1 < options.count, options[i + 1].hasPrefix("BatchMode=") {
+                i += 2
+                continue
+            }
+            filtered.append(options[i])
+            i += 1
+        }
+        return filtered
     }
 
     private static func shellEscape(_ value: String) -> String {

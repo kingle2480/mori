@@ -2,6 +2,8 @@ import Foundation
 import MoriCore
 
 enum SSHControlOptions {
+    static let controlPersist = "8h"
+
     static func controlPath(for ssh: SSHWorkspaceLocation) -> String {
         let allowed = CharacterSet.alphanumerics
         let sanitized = String(
@@ -17,7 +19,7 @@ enum SSHControlOptions {
         [
             "-o", "BatchMode=yes",
             "-o", "ControlMaster=auto",
-            "-o", "ControlPersist=10m",
+            "-o", "ControlPersist=\(controlPersist)",
             "-o", "ControlPath=\(controlPath(for: ssh))",
         ]
     }
@@ -55,7 +57,7 @@ enum SSHBootstrapper {
         var args: [String] = [
             "-o", "ConnectTimeout=8",
             "-o", "ControlMaster=auto",
-            "-o", "ControlPersist=10m",
+            "-o", "ControlPersist=\(SSHControlOptions.controlPersist)",
             "-o", "ControlPath=\(SSHControlOptions.controlPath(for: ssh))",
             "-o", "PreferredAuthentications=password,keyboard-interactive",
             "-o", "PubkeyAuthentication=no",

@@ -212,8 +212,8 @@ final class RemoteConnectWizardController: NSWindowController {
         case .password:
             titleLabel.stringValue = "Password Authentication"
             stepLabel.stringValue = "STEP 3"
-            subtitleLabel.stringValue = "Enter the SSH password for this host (session only)"
-            helperLabel.stringValue = "Password is used to bootstrap a session and is not persisted on disk."
+            subtitleLabel.stringValue = "Enter the SSH password for this host"
+            helperLabel.stringValue = "Password is stored securely in Keychain and reused across restarts."
             secureInputField.placeholderString = "Password"
             secureInputField.stringValue = password ?? ""
             secureInputField.isHidden = false

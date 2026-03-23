@@ -14,6 +14,7 @@ enum WorkspaceError: Error, LocalizedError {
     case remotePathEmpty
     case remoteTmuxUnavailable(String)
     case remotePasswordEmpty
+    case remotePasswordPersistFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -31,6 +32,8 @@ enum WorkspaceError: Error, LocalizedError {
             return "tmux is not available on remote host \"\(host)\"."
         case .remotePasswordEmpty:
             return "Password is required for password authentication."
+        case .remotePasswordPersistFailed(let message):
+            return "Failed to persist SSH password: \(message)"
         }
     }
 }
@@ -181,13 +184,17 @@ final class WorkspaceManager {
             if let cached = remoteTmuxBackends[key] {
                 return cached
             }
+            let password = ssh.authMethod == .password
+                ? SSHCredentialStore.password(for: ssh)
+                : nil
             let backend = TmuxBackend(
                 runner: TmuxCommandRunner(
                     sshConfig: TmuxSSHConfig(
                         host: ssh.host,
                         user: ssh.user,
                         port: ssh.port,
-                        sshOptions: SSHControlOptions.sshOptions(for: ssh)
+                        sshOptions: SSHControlOptions.sshOptions(for: ssh),
+                        askpassPassword: password
                     )
                 )
             )
@@ -209,13 +216,17 @@ final class WorkspaceManager {
             if let cached = remoteGitBackends[key] {
                 return cached
             }
+            let password = ssh.authMethod == .password
+                ? SSHCredentialStore.password(for: ssh)
+                : nil
             let backend = GitBackend(
                 runner: GitCommandRunner(
                     sshConfig: GitSSHConfig(
                         host: ssh.host,
                         user: ssh.user,
                         port: ssh.port,
-                        sshOptions: SSHControlOptions.sshOptions(for: ssh)
+                        sshOptions: SSHControlOptions.sshOptions(for: ssh),
+                        askpassPassword: password
                     )
                 )
             )
@@ -238,6 +249,14 @@ final class WorkspaceManager {
 
     private func rawWindowId(from runtimeWindow: RuntimeWindow) -> String {
         runtimeWindow.tmuxWindowRawId ?? runtimeWindow.tmuxWindowId
+    }
+
+    func tmuxBackendForWorktree(_ worktree: Worktree) -> TmuxBackend {
+        tmuxBackend(for: worktree)
+    }
+
+    func rawTmuxWindowId(from runtimeWindow: RuntimeWindow) -> String {
+        rawWindowId(from: runtimeWindow)
     }
 
     private func endpointKey(for worktree: Worktree) -> String {
@@ -476,6 +495,11 @@ final class WorkspaceManager {
                 ssh: sshLocation,
                 password: password
             )
+            do {
+                try SSHCredentialStore.savePassword(password ?? "", for: sshLocation)
+            } catch {
+                throw WorkspaceError.remotePasswordPersistFailed(error.localizedDescription)
+            }
         }
 
         let location = WorkspaceLocation.ssh(
@@ -1679,18 +1703,48 @@ final class WorkspaceManager {
                 }
 
                 // 3. Restore selected window (after runtime state is loaded)
-                if let windowId = uiState.selectedWindowId,
-                   let runtimeWindow = appState.runtimeWindows.first(where: { $0.tmuxWindowId == windowId }) {
-                    appState.uiState.selectedWindowId = windowId
-                    // Switch tmux to the saved window
-                    if let sessionName = worktree.tmuxSessionName {
-                        let rawWindowId = rawWindowId(from: runtimeWindow)
-                        let tmux = tmuxBackend(for: worktree)
-                        try? await tmux.selectWindow(sessionId: sessionName, windowId: rawWindowId)
+                if let savedWindowId = uiState.selectedWindowId {
+                    let migratedWindowId = migratedWindowIdIfNeeded(
+                        savedWindowId: savedWindowId,
+                        worktree: worktree
+                    )
+                    if let windowId = migratedWindowId,
+                       let runtimeWindow = appState.runtimeWindows.first(where: { $0.tmuxWindowId == windowId }) {
+                        appState.uiState.selectedWindowId = windowId
+                        if windowId != savedWindowId {
+                            saveUIState()
+                        }
+                        // Switch tmux to the saved window
+                        if let sessionName = worktree.tmuxSessionName {
+                            let rawWindowId = rawWindowId(from: runtimeWindow)
+                            let tmux = tmuxBackend(for: worktree)
+                            try? await tmux.selectWindow(sessionId: sessionName, windowId: rawWindowId)
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// Migrate pre-remote-namespace persisted IDs (e.g. "@1") to endpoint-scoped IDs
+    /// (e.g. "local|@1" or "ssh:user@host|@1") during first restore after upgrade.
+    private func migratedWindowIdIfNeeded(
+        savedWindowId: String,
+        worktree: Worktree
+    ) -> String? {
+        if appState.runtimeWindows.contains(where: { $0.tmuxWindowId == savedWindowId }) {
+            return savedWindowId
+        }
+
+        guard !savedWindowId.contains(WorkspaceEndpoint.separator) else {
+            return nil
+        }
+
+        let candidate = namespacedWindowId(rawWindowId: savedWindowId, worktree: worktree)
+        if appState.runtimeWindows.contains(where: { $0.tmuxWindowId == candidate }) {
+            return candidate
+        }
+        return nil
     }
 
     // MARK: - Hook Helpers

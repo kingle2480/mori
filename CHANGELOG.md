@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/build-ghostty.sh` now auto-installs the Metal Toolchain when `xcrun metal` is unavailable
 - Settings `Open Config` now forces text-editor open and normalizes config file permissions to non-executable
 - Remote terminal attach now reuses SSH control options for more reliable remote tmux session handling
+- Password-auth SSH projects now persist credentials in macOS Keychain and automatically re-authenticate after app restarts
+- Terminal surface caching now namespaces by endpoint so local and remote sessions with the same tmux name no longer collide
+- `mori send` / `mori new-window` now route to the selected worktree's endpoint backend and use raw tmux target IDs
+- Persisted selected window IDs now migrate from legacy raw tmux IDs (e.g. `@1`) to endpoint-namespaced IDs on first restore
+- Remote tmux commands now augment PATH (`/opt/homebrew/bin`, `/usr/local/bin`) to support non-default remote installs
 
 ## [0.1.0] - 2026-03-20
 

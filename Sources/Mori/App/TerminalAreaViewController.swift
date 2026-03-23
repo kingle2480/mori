@@ -16,7 +16,7 @@ final class TerminalAreaViewController: NSViewController {
 
     // MARK: - State
 
-    private var currentSessionName: String?
+    private var currentSessionKey: String?
     private var currentSurface: NSView?
     private var emptyStateView: NSView?
 
@@ -78,8 +78,10 @@ final class TerminalAreaViewController: NSViewController {
     ///   - workingDirectory: The worktree path for the terminal's CWD
     ///   - location: Local or SSH remote endpoint.
     func attachToSession(sessionName: String, workingDirectory: String, location: WorkspaceLocation = .local) {
+        let sessionKey = sessionIdentityKey(sessionName: sessionName, location: location)
+
         // Skip if already showing this session
-        if sessionName == currentSessionName {
+        if sessionKey == currentSessionKey {
             focusCurrentSurface()
             return
         }
@@ -116,7 +118,7 @@ final class TerminalAreaViewController: NSViewController {
             effectiveWorkingDirectory = NSHomeDirectory()
         }
         let surface = surfaceCache.surface(
-            forSession: sessionName,
+            forSessionKey: sessionKey,
             command: command,
             workingDirectory: effectiveWorkingDirectory
         )
@@ -136,7 +138,7 @@ final class TerminalAreaViewController: NSViewController {
             surface.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
 
-        currentSessionName = sessionName
+        currentSessionKey = sessionKey
         currentSurface = surface
 
         // Resize to current bounds
@@ -149,12 +151,12 @@ final class TerminalAreaViewController: NSViewController {
     /// Detach the current terminal surface and evict it from the cache.
     /// The dead surface can't be reused — reconnect creates a fresh one.
     func detach() {
-        if let session = currentSessionName {
-            surfaceCache.remove(sessionName: session)
+        if let sessionKey = currentSessionKey {
+            surfaceCache.remove(sessionKey: sessionKey)
         }
         currentSurface?.removeFromSuperview()
         currentSurface = nil
-        currentSessionName = nil
+        currentSessionKey = nil
         showEmptyState()
     }
 
@@ -248,6 +250,10 @@ final class TerminalAreaViewController: NSViewController {
 
     private func shellEscape(_ str: String) -> String {
         "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private func sessionIdentityKey(sessionName: String, location: WorkspaceLocation) -> String {
+        "\(location.endpointKey)|\(sessionName)"
     }
 
     private func showError(_ message: String) {
