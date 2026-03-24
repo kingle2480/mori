@@ -94,6 +94,7 @@ final class TerminalAreaViewController: NSViewController {
         if let oldSurface = currentSurface {
             oldSurface.removeFromSuperview()
         }
+        removeResidualTerminalSubviews()
 
         // Get or create surface from cache.
         // Use `has-session` to check first, avoiding tmux parsing the session
@@ -160,6 +161,7 @@ final class TerminalAreaViewController: NSViewController {
         currentSurface?.removeFromSuperview()
         currentSurface = nil
         currentSessionKey = nil
+        removeResidualTerminalSubviews()
         showEmptyState()
     }
 
@@ -259,6 +261,15 @@ final class TerminalAreaViewController: NSViewController {
         "\(location.endpointKey)|\(sessionName)"
     }
 
+    /// Defensive cleanup in case a dead surface view was not tracked as current.
+    private func removeResidualTerminalSubviews() {
+        for subview in view.subviews where subview !== emptyStateView {
+            if subview !== currentSurface {
+                subview.removeFromSuperview()
+            }
+        }
+    }
+
     private func showError(_ message: String) {
         guard let window = view.window else { return }
         let alert = NSAlert()
@@ -296,12 +307,15 @@ final class TerminalAreaViewController: NSViewController {
         isHandlingSurfaceExit = true
         defer { isHandlingSurfaceExit = false }
 
+        currentSurface.removeFromSuperview()
+
         // Remove dead surface from cache so reconnect creates a fresh process.
         if let sessionKey = currentSessionKey {
             surfaceCache.remove(sessionKey: sessionKey)
         }
         self.currentSurface = nil
         self.currentSessionKey = nil
+        removeResidualTerminalSubviews()
         showEmptyState()
 
         // Auto-recover when a worktree is selected (session died / ssh dropped).
