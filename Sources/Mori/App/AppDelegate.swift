@@ -357,7 +357,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     password: input.password
                 )
                 self.mainWindowController?.updateTitle(projectName: project.name)
-                await self.offerAttachToExistingRemoteSessionIfNeeded(projectId: project.id)
+                self.scheduleAttachExistingRemoteSessionPrompt(projectId: project.id)
                 return .success(())
             } catch {
                 return .failure(error)
@@ -365,6 +365,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         remoteConnectWizardController = wizard
         wizard.present(over: mainWindowController?.window)
+    }
+
+    private func scheduleAttachExistingRemoteSessionPrompt(projectId: UUID) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let window = self.mainWindowController?.window else { return }
+
+            // Wait until the remote-connect wizard sheet has been dismissed.
+            var attempts = 0
+            while window.attachedSheet != nil, attempts < 40 {
+                attempts += 1
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+
+            await self.offerAttachToExistingRemoteSessionIfNeeded(projectId: projectId)
+        }
     }
 
     private func offerAttachToExistingRemoteSessionIfNeeded(projectId: UUID) async {
