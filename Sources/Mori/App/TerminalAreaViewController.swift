@@ -1,6 +1,7 @@
 import AppKit
 import MoriCore
 import MoriTerminal
+import MoriTmux
 
 /// View controller that hosts terminal surfaces, one per tmux session.
 /// Uses a TerminalSurfaceCache to manage an LRU pool of surfaces (max 3).
@@ -21,6 +22,7 @@ final class TerminalAreaViewController: NSViewController {
     private var emptyStateView: NSView?
     private var isHandlingSurfaceExit = false
     private var isAutoReconnecting = false
+    var tmuxBinaryPath: String = TmuxCommandRunner.preferredBinaryPath() ?? "tmux"
 
     /// Callback invoked when the user clicks the empty-state button.
     /// If a worktree is selected (dead session), this should recreate the session.
@@ -102,12 +104,13 @@ final class TerminalAreaViewController: NSViewController {
         // Use `new-session -A` to atomically attach-or-create without shell
         // fallback chains (`has-session && attach || new-session`).
         let escaped = shellEscape(sessionName)
+        let escapedTmux = shellEscape(tmuxBinaryPath)
         let command: String
         let effectiveWorkingDirectory: String
         switch location {
         case .local:
             let escapedCwd = shellEscape(workingDirectory)
-            command = "export STARSHIP_LOG=error; export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\"; tmux new-session -A -s \(escaped) -c \(escapedCwd)"
+            command = "export STARSHIP_LOG=error; export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\"; \(escapedTmux) new-session -A -s \(escaped) -c \(escapedCwd)"
             effectiveWorkingDirectory = workingDirectory
         case .ssh(let ssh):
             let termProgram = ProcessInfo.processInfo.environment["TERM_PROGRAM"] ?? "ghostty"

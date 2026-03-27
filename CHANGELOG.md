@@ -52,6 +52,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keychain credential read failures are now surfaced to users with actionable alerts instead of silently falling back as "password not found"
 - Ghostty config save now avoids redundant directory creation by relying on `ensureConfigFileExists()`
 - Added unit tests for shared SSH helper behaviors (control path length, option filtering, shell escaping, askpass environment hardening)
+- Mori app termination now removes the IPC socket synchronously, and the `mori` CLI now reports missing or stale app sockets directly instead of timing out
+
+## [0.1.2] - 2026-03-27
+
+### ✨ Features
+
+- Release app bundles now embed the `mori` CLI to support Homebrew cask installs
+
+### 🐛 Bug Fixes
+
+- Tagged releases now stamp Mori.app with the actual release version instead of a hardcoded app version
+
+### 📝 Documentation
+
+- Added Homebrew tap install instructions to the English and Chinese READMEs
+
+### 🔧 CI/CD
+
+- Release automation now updates `vaayne/homebrew-tap` with the new Homebrew cask version and SHA-256 after publishing a tagged release
+
+**Full Changelog**: [v0.1.1...v0.1.2](https://github.com/vaayne/mori/compare/v0.1.1...v0.1.2)
+
+## [0.1.1] - 2026-03-27
+
+### ✨ Features
+
+- Task Mode sidebar groups worktrees by workflow status, supports manual status changes, and keeps project selection in sync across task-focused navigation
+- Worktree creation now uses a dedicated panel with local and remote branch discovery
+- Sidebar worktree rows now show upstream state, relative activity time, and richer git status information
+- Network proxy settings can be applied to tmux sessions from the app
+- macOS release builds now ship as signed, notarized app archives plus DMG installers
+
+### 🐛 Bug Fixes
+
+- Packaged `.app` bundles now load SwiftPM resources from the app bundle correctly and launch tmux using the resolved absolute binary path
+- Release archives now avoid AppleDouble `._` files across copy, zip, and unzip flows so signatures remain valid after download
+- Release workflow env handling and signing/notarization steps were fixed for CI builds
+- Task sidebar and tmux integration received follow-up fixes for naming, session theme application, and startup behavior
+
+### 📝 Documentation
+
+- Added code signing, network proxy, and worktree guides
+- Updated README, keymaps, and release-related docs to match the current app behavior
+
+### 🔧 CI/CD
+
+- Release automation now builds signed and notarized archives and publishes DMG artifacts
+
+**Full Changelog**: [v0.1.0...v0.1.1](https://github.com/vaayne/mori/compare/v0.1.0...v0.1.1)
 
 ## [0.1.0] - 2026-03-20
 
@@ -103,5 +152,7 @@ Initial release of Mori — a macOS native workspace terminal organized around P
 
 **Full Changelog**: [v0.1.0](https://github.com/vaayne/mori/commits/v0.1.0)
 
-[Unreleased]: https://github.com/vaayne/mori/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/vaayne/mori/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/vaayne/mori/releases/tag/v0.1.2
+[0.1.1]: https://github.com/vaayne/mori/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vaayne/mori/releases/tag/v0.1.0

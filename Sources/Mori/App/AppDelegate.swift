@@ -238,6 +238,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 return
             }
 
+            if let terminalArea = self.terminalAreaController,
+               let tmuxPath = try? await manager.tmuxBackend.resolvedBinaryPath() {
+                terminalArea.tmuxBinaryPath = tmuxPath
+            }
+
             // Initial runtime state load
             await manager.refreshRuntimeState()
 
@@ -269,6 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 
         // Stop IPC server
+        IPCServer.removeSocketFile()
         if let server = ipcServer {
             Task { await server.stop() }
         }

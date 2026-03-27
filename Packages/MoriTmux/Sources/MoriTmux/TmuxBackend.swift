@@ -75,6 +75,10 @@ public actor TmuxBackend: TmuxControlling {
         await runner.isAvailable()
     }
 
+    public func resolvedBinaryPath() async throws -> String {
+        try await runner.resolveBinaryPath()
+    }
+
     public func scanAll() async throws -> [TmuxSession] {
         // 1. List all sessions
         let sessionsOutput = try await runner.run(

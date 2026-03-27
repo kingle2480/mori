@@ -3,29 +3,57 @@ set -euo pipefail
 
 APP_NAME="Mori"
 BUNDLE_ID="dev.mori.app"
-BUILD_DIR=".build/release"
+APP_BUILD_DIR=".build/release"
+CLI_BUILD_DIR=".build-cli/release"
 APP_BUNDLE="${APP_NAME}.app"
+MORI_VERSION="${MORI_VERSION:-0.1.0}"
+MORI_BUNDLE_VERSION="${MORI_VERSION%%-*}"
+MORI_BUNDLE_VERSION="${MORI_BUNDLE_VERSION%%+*}"
 
-# Build release (GUI target only — "Mori" and "mori" collide on case-insensitive FS)
+# Build app and CLI separately. "Mori" and "mori" collide on the default
+# case-insensitive macOS filesystem, so the CLI uses a dedicated build path.
 swift build -c release --product Mori 2>&1 | xcbeautify
+swift build --build-path .build-cli -c release --product mori 2>&1 | xcbeautify
 
 # Create .app structure
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
+mkdir -p "$APP_BUNDLE/Contents/MacOS/bin"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 # Copy executable
-cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+cp "$APP_BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+cp "$CLI_BUILD_DIR/mori" "$APP_BUNDLE/Contents/MacOS/bin/mori"
 
 # Copy app icon
 cp "assets/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+
+copy_resource_bundles() {
+    local build_dir="$1"
+    local target_dir="$2"
+    for bundle in "$build_dir"/*.bundle; do
+        if [[ -d "$bundle" ]]; then
+            local target="${target_dir}/$(basename "$bundle")"
+            rm -rf "$target"
+            ditto --norsrc "$bundle" "$target"
+            find "$target" -name "._*" -delete 2>/dev/null || true
+            echo "   Bundled: $(basename "$bundle")"
+        fi
+    done
+}
+
+# Copy SPM resource bundles into Contents/Resources/ so the packaged app and
+# runtime bundle lookup use the same app bundle layout in local and CI builds.
+copy_resource_bundles "$APP_BUILD_DIR" "$APP_BUNDLE/Contents/Resources"
+# SwiftPM's Bundle.module for the CLI resolves relative to bin/mori.
+copy_resource_bundles "$CLI_BUILD_DIR" "$APP_BUNDLE/Contents/MacOS/bin"
 
 # Copy ghostty resources (terminfo sentinel + themes) so libghostty can resolve
 # its resources_dir from the app bundle. Ghostty walks up from the executable
 # looking for Contents/Resources/terminfo/78/xterm-ghostty as a sentinel.
 GHOSTTY_RESOURCES="Frameworks/ghostty-resources"
 if [[ -d "$GHOSTTY_RESOURCES" ]]; then
-    cp -R "$GHOSTTY_RESOURCES/"* "$APP_BUNDLE/Contents/Resources/"
+    ditto "$GHOSTTY_RESOURCES" "$APP_BUNDLE/Contents/Resources/"
     echo "   Ghostty resources bundled (themes, terminfo, shell-integration)"
 else
     echo "⚠️  Warning: $GHOSTTY_RESOURCES not found. Run 'mise run build:ghostty' first."
@@ -48,9 +76,9 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
     <key>CFBundleDisplayName</key>
     <string>${APP_NAME}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${MORI_BUNDLE_VERSION}</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>${MORI_BUNDLE_VERSION}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -68,6 +96,15 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 </dict>
 </plist>
 EOF
+
+# Sign if SIGNING_IDENTITY is set
+if [[ -n "${SIGNING_IDENTITY:-}" ]]; then
+    SIGN_ARGS=()
+    if [[ -n "${KEYCHAIN_PROFILE:-}" ]]; then
+        SIGN_ARGS+=(--notarize)
+    fi
+    bash scripts/sign.sh "${SIGN_ARGS[@]}"
+fi
 
 # In CI, keep the bundle in the working directory for archiving
 if [[ -z "${CI:-}" ]]; then
