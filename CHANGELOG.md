@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-03-27
+
 ### ✨ Features
 
 - Release app bundles now embed the `mori` CLI to support Homebrew cask installs
@@ -22,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔧 CI/CD
 
 - Release automation now updates `vaayne/homebrew-tap` with the new Homebrew cask version and SHA-256 after publishing a tagged release
+
+**Full Changelog**: [v0.1.1...v0.1.2](https://github.com/vaayne/mori/compare/v0.1.1...v0.1.2)
 
 ## [0.1.1] - 2026-03-27
 
@@ -101,6 +105,7 @@ Initial release of Mori — a macOS native workspace terminal organized around P
 
 **Full Changelog**: [v0.1.0](https://github.com/vaayne/mori/commits/v0.1.0)
 
-[Unreleased]: https://github.com/vaayne/mori/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/vaayne/mori/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/vaayne/mori/releases/tag/v0.1.2
 [0.1.1]: https://github.com/vaayne/mori/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vaayne/mori/releases/tag/v0.1.0
