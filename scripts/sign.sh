@@ -121,9 +121,21 @@ if [[ "$NOTARIZE" == "true" ]]; then
     ditto -c -k --norsrc --keepParent "$APP_BUNDLE" "$NOTARIZE_ZIP"
 
     echo "🚀 Submitting for notarization..."
-    xcrun notarytool submit "$NOTARIZE_ZIP" \
+    NOTARY_OUTPUT=$(xcrun notarytool submit "$NOTARIZE_ZIP" \
         --keychain-profile "$KEYCHAIN_PROFILE" \
-        --wait
+        --wait 2>&1) || true
+    echo "$NOTARY_OUTPUT"
+
+    # Extract submission ID and check status
+    SUBMISSION_ID=$(echo "$NOTARY_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+    if echo "$NOTARY_OUTPUT" | grep -qi "Invalid\|rejected"; then
+        echo "❌ Notarization failed. Fetching log..."
+        if [[ -n "$SUBMISSION_ID" ]]; then
+            xcrun notarytool log "$SUBMISSION_ID" \
+                --keychain-profile "$KEYCHAIN_PROFILE" || true
+        fi
+        exit 1
+    fi
 
     echo "📌 Stapling notarization ticket..."
     xcrun stapler staple "$APP_BUNDLE"
