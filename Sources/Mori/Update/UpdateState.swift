@@ -122,7 +122,7 @@ enum UpdateState: Equatable {
         let acknowledgement: () -> Void
 
         /// Acknowledge and transition back to idle. Safe to call multiple times via `callOnce` on construction.
-        func dismiss(from model: UpdateViewModel) {
+        @MainActor func dismiss(from model: UpdateViewModel) {
             model.state = .idle
             acknowledgement()
         }

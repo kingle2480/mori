@@ -6,7 +6,8 @@ import Foundation
 import SwiftUI
 @preconcurrency import Sparkle
 
-final class UpdateViewModel: ObservableObject {
+@MainActor
+final class UpdateViewModel: ObservableObject, @unchecked Sendable {
     @Published var state: UpdateState = .idle
 
     /// The text to display for the current update state.
