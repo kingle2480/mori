@@ -6,7 +6,6 @@ import Foundation
 import SwiftUI
 @preconcurrency import Sparkle
 
-@MainActor
 final class UpdateViewModel: ObservableObject, @unchecked Sendable {
     @Published var state: UpdateState = .idle
 
