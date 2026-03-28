@@ -25,6 +25,11 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$APP_BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "$CLI_BUILD_DIR/mori" "$APP_BUNDLE/Contents/MacOS/bin/mori"
 
+# Add rpath so the app finds frameworks in Contents/Frameworks/ at runtime.
+# SPM only sets @loader_path; bundled .app needs @executable_path/../Frameworks.
+install_name_tool -add_rpath @executable_path/../Frameworks \
+    "$APP_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+
 # Copy app icon
 cp "assets/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
