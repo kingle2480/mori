@@ -43,27 +43,25 @@ echo "🔏 Signing $APP_BUNDLE with identity: $SIGNING_IDENTITY"
 # Remove any ._ AppleDouble files that would invalidate the seal
 find "$APP_BUNDLE" -name "._*" -delete 2>/dev/null || true
 
-# Inside-out signing of embedded frameworks:
-# 1. Standalone binaries (e.g. Sparkle's Autoupdate)
-# 2. Nested .app bundles (e.g. Sparkle's Updater.app)
-# 3. XPC services inside frameworks
-# 4. Frameworks and dylibs themselves
+# Inside-out signing of embedded frameworks.
+# Apple notarization requires every executable to be signed with Developer ID +
+# secure timestamp. We must sign deepest-first (inside-out).
 if [[ -d "$APP_BUNDLE/Contents/Frameworks" ]]; then
-    # Sign standalone executables inside framework versions (not inside .app or .xpc)
-    find "$APP_BUNDLE/Contents/Frameworks" -type f -perm +111 \
-        ! -path "*.app/*" ! -path "*.xpc/*" ! -path "*.framework/Versions/*/Headers/*" \
-        ! -path "*.framework/Versions/*/Modules/*" ! -path "*.framework/Versions/*/Resources/*" \
-        ! -name "*.dylib" -print0 | while IFS= read -r -d '' item; do
-        # Skip symlinks and framework main executables (signed with their framework)
-        [[ -L "$item" ]] && continue
-        local_name="${item#"$APP_BUNDLE"/Contents/Frameworks/}"
-        echo "   Signing binary: $local_name"
-        codesign --force --options runtime --timestamp \
-            --sign "$SIGNING_IDENTITY" \
-            "$item"
+    # 1. Sign ALL Mach-O executables inside frameworks (deepest first).
+    #    This catches standalone helpers (Autoupdate), nested app binaries
+    #    (Updater.app/Contents/MacOS/Updater), and XPC binaries.
+    find "$APP_BUNDLE/Contents/Frameworks" -type f -print0 | while IFS= read -r -d '' item; do
+        # Only sign Mach-O binaries (skip headers, plists, resources, etc.)
+        if file -b "$item" | grep -q "Mach-O"; then
+            local_name="${item#"$APP_BUNDLE"/Contents/Frameworks/}"
+            echo "   Signing Mach-O: $local_name"
+            codesign --force --options runtime --timestamp \
+                --sign "$SIGNING_IDENTITY" \
+                "$item"
+        fi
     done
 
-    # Sign nested .app bundles inside frameworks (e.g. Sparkle's Updater.app)
+    # 2. Sign nested .app bundles (e.g. Sparkle's Updater.app)
     find "$APP_BUNDLE/Contents/Frameworks" -name "*.app" -type d -print0 | while IFS= read -r -d '' item; do
         echo "   Signing nested app: $(basename "$item")"
         codesign --force --options runtime --timestamp \
@@ -71,7 +69,7 @@ if [[ -d "$APP_BUNDLE/Contents/Frameworks" ]]; then
             "$item"
     done
 
-    # Sign XPC services inside frameworks
+    # 3. Sign XPC services inside frameworks
     find "$APP_BUNDLE/Contents/Frameworks" -name "*.xpc" -type d -print0 | while IFS= read -r -d '' item; do
         echo "   Signing embedded XPC: $(basename "$item")"
         codesign --force --options runtime --timestamp \
@@ -79,7 +77,7 @@ if [[ -d "$APP_BUNDLE/Contents/Frameworks" ]]; then
             "$item"
     done
 
-    # Sign frameworks and dylibs
+    # 4. Sign frameworks and dylibs
     find "$APP_BUNDLE/Contents/Frameworks" \( -name "*.dylib" -o -name "*.framework" \) -print0 | while IFS= read -r -d '' item; do
         echo "   Signing: $(basename "$item")"
         codesign --force --options runtime --timestamp \
