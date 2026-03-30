@@ -5,10 +5,10 @@ Mori integrates with coding agents (Claude Code, Codex CLI, Pi) to display their
 ## How It Works
 
 When enabled, each agent installs hook scripts that report state changes to tmux via pane options:
-- `@mori-agent-state`: `"working"` (agent is running) or `"done"` (agent finished)
+- `@mori-agent-state`: `"working"` (agent is running), `"waiting"` (agent finished turn, awaiting input), or `"done"` (agent exited)
 - `@mori-agent-name`: Agent name (e.g., `"claude"`, `"codex"`, `"pi"`)
 
-During Mori's 5-second polling cycle, it reads these options directly from tmux — no process scanning, no pattern matching. Tab names show the agent name (e.g., `claude`, `codex`, `pi`), with sidebar badges (⚡ working / ✅ done). macOS notifications fire on completion.
+During Mori's 5-second polling cycle, it reads these options directly from tmux — no process scanning, no pattern matching. Tab names show the agent name (e.g., `claude`, `codex`, `pi`), with sidebar badges (⚡ working / ❗ waiting / ✅ done). macOS notifications fire on state transitions.
 
 ## Installation
 
@@ -22,7 +22,7 @@ During Mori's 5-second polling cycle, it reads these options directly from tmux 
    - `Stop` (agent stopped)
    - `Notification` (completion notification)
 
-Run Claude Code in a tmux window. Tab renames to `claude` while working (⚡ badge shown in sidebar), then back to default after completion (✅ badge shown).
+Run Claude Code in a tmux window. Tab renames to `claude` while working (⚡ badge shown in sidebar), then shows waiting badge (❗) when the turn completes. Click the waiting badge to reply inline.
 
 ### Codex CLI
 
@@ -36,7 +36,7 @@ Run Claude Code in a tmux window. Tab renames to `claude` while working (⚡ bad
 
 **Important:** The `notify` entry must be **top-level** in the TOML file (before any `[section]` headers). Mori enforces this automatically.
 
-Run Codex in a tmux window. Tab renames to `codex` while working (⚡ badge shown in sidebar), then back to default on completion (✅ badge shown).
+Run Codex in a tmux window. Tab renames to `codex` while working (⚡ badge shown in sidebar), then shows waiting badge (❗) when the turn completes.
 
 ### Pi
 
@@ -51,7 +51,7 @@ Run Codex in a tmux window. Tab renames to `codex` while working (⚡ badge show
    }
    ```
 
-Run Pi in a tmux window. Tab renames to `pi` while working (⚡ badge shown in sidebar), then back to default on completion (✅ badge shown).
+Run Pi in a tmux window. Tab renames to `pi` while working (⚡ badge shown in sidebar), then shows waiting badge (❗) when the turn completes. Click the waiting badge to reply inline.
 
 ## Hook Scripts
 
@@ -63,7 +63,7 @@ Shared bash functions sourced by agent-specific scripts. Sets `@mori-agent-state
 ### mori-agent-hook.sh (Claude Code)
 Responds to Claude Code hook events:
 - `UserPromptSubmit`, `PreToolUse` → state: `"working"`
-- `Stop`, `Notification` → state: `"done"`
+- `Stop`, `Notification` → state: `"waiting"`
 
 Drains stdin (Claude Code pipes JSON hook data) and bails silently if not in tmux.
 
@@ -80,7 +80,7 @@ Also supports modern event-based format if Codex adds explicit hook events.
 ### mori-pi-extension.ts (Pi)
 TypeScript extension listening to Pi events:
 - `agent_start`, `tool_execution_start` → state: `"working"`
-- `agent_end` → state: `"done"`
+- `agent_end` → state: `"waiting"`
 
 ## Disabling Hooks
 

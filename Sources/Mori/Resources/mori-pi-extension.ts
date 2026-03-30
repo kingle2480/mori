@@ -25,7 +25,7 @@ export default function (pi: any) {
   });
 
   pi.on("agent_end", async () => {
-    await setState("done");
+    await setState("waiting");
   });
 
   pi.on("tool_execution_start", async () => {

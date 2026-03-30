@@ -1537,6 +1537,7 @@ final class WorkspaceManager {
     private func mapHookState(_ state: String) -> AgentState {
         switch state {
         case "working": return .running
+        case "waiting": return .waitingForInput
         case "done": return .completed
         default: return .none
         }

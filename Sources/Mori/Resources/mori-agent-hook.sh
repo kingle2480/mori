@@ -22,7 +22,7 @@ case "$HOOK_TYPE" in
         set_state "working"
         ;;
     Stop|Notification)
-        set_state "done"
+        set_state "waiting"
         ;;
     *)
         exit 0
