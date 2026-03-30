@@ -14,6 +14,7 @@ public struct AgentWindowRowView: View {
     @State private var isHovered = false
     @State private var showPopover = false
     @State private var popoverOutput: String?
+    @State private var isLoadingOutput = false
     @State private var hoverTask: Task<Void, Never>?
     @State private var showReplyField = false
 
@@ -43,23 +44,33 @@ public struct AgentWindowRowView: View {
         .onHover { hovering in
             isHovered = hovering
             hoverTask?.cancel()
-            if hovering, let onRequestPaneOutput {
+            if hovering, onRequestPaneOutput != nil {
                 hoverTask = Task {
-                    try? await Task.sleep(for: .milliseconds(300))
+                    try? await Task.sleep(for: .milliseconds(100))
                     guard !Task.isCancelled else { return }
+                    isLoadingOutput = true
+                    showPopover = true
                     let paneId = window.activePaneId ?? window.tmuxWindowId
-                    onRequestPaneOutput(paneId) { output in
+                    onRequestPaneOutput?(paneId) { output in
                         self.popoverOutput = output
-                        self.showPopover = output != nil
+                        self.isLoadingOutput = false
+                        if output == nil {
+                            self.showPopover = false
+                        }
                     }
                 }
             } else {
                 showPopover = false
                 popoverOutput = nil
+                isLoadingOutput = false
             }
         }
         .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            if let output = popoverOutput {
+            if isLoadingOutput {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(MoriTokens.Spacing.lg)
+            } else if let output = popoverOutput {
                 PanePreviewPopover(output: output)
             }
         }
