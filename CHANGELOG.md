@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-03-31
+
+### 🐛 Bug Fixes
+
+- Fix "Check for Updates" doing nothing — Sparkle 2.9 rejected duplicate XPC services in both `Contents/XPCServices/` and inside `Sparkle.framework`, causing `SPUUpdater.start()` to silently fail
+
+**Full Changelog**: [v0.2.1...v0.2.2](https://github.com/vaayne/mori/compare/v0.2.1...v0.2.2)
+
 ## [0.2.1] - 2026-03-31
 
 ### ✨ Features
