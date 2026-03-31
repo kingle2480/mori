@@ -75,19 +75,6 @@ if [[ -d "$SPARKLE_FW_SRC" ]]; then
     mkdir -p "$APP_BUNDLE/Contents/Frameworks"
     ditto "$SPARKLE_FW_SRC" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 
-    # Sparkle bundles XPC services inside the framework — copy them to the app
-    # bundle's top-level XPCServices/ so launchd can find them.
-    SPARKLE_XPC_DIR="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices"
-    if [[ -d "$SPARKLE_XPC_DIR" ]]; then
-        mkdir -p "$APP_BUNDLE/Contents/XPCServices"
-        for xpc in "$SPARKLE_XPC_DIR"/*.xpc; do
-            if [[ -d "$xpc" ]]; then
-                ditto "$xpc" "$APP_BUNDLE/Contents/XPCServices/$(basename "$xpc")"
-                echo "   XPC service: $(basename "$xpc")"
-            fi
-        done
-    fi
-
     echo "   Sparkle.framework embedded"
 else
     echo "⚠️  Warning: Sparkle.framework not found at $SPARKLE_FW_SRC"
