@@ -1,7 +1,7 @@
 import Foundation
 
-/// Simple fuzzy matching utility for command palette search.
-/// Scoring: exact prefix > word boundary > substring > no match.
+/// Fuzzy matching utility for command palette search.
+/// Supports non-contiguous character matching with graduated scoring.
 /// Case-insensitive throughout.
 public enum FuzzyMatcher {
 
@@ -9,68 +9,179 @@ public enum FuzzyMatcher {
     /// 0 means no match; higher is better.
     ///
     /// - Empty query returns maximum score (matches everything).
-    /// - Exact prefix match: 100 points
-    /// - Word boundary match (query matches start of a word in candidate): 75 points
-    /// - Substring match (query found anywhere): 50 points
-    /// - No match: 0 points
+    /// - Scoring rewards: prefix matches, word boundary matches, consecutive matches.
+    /// - Scoring penalizes: gaps between matched characters.
     public static func score(query: String, candidate: String) -> Int {
-        // Empty query matches everything with max score
-        guard !query.isEmpty else { return 100 }
+        guard !query.isEmpty else { return 1000 }
+        guard !candidate.isEmpty else { return 0 }
 
-        let lowerQuery = query.lowercased()
-        let lowerCandidate = candidate.lowercased()
+        let queryChars = Array(query.lowercased())
+        let candidateChars = Array(candidate.lowercased())
+        let candidateOriginal = Array(candidate)
 
-        // Exact prefix match
-        if lowerCandidate.hasPrefix(lowerQuery) {
-            return 100
+        let qLen = queryChars.count
+        let cLen = candidateChars.count
+
+        guard qLen <= cLen else { return 0 }
+
+        // DP approach: dp[q][c] = best score for matching queryChars[0..<q]
+        // ending with the q-th query char matched at candidateChars[c-1].
+        // We also track the consecutive count for proper bonus calculation.
+        //
+        // For each query char q, we try all candidate positions c where
+        // candidateChars[c] == queryChars[q], and take the best score from
+        // any valid previous position.
+
+        // For each (q, c) store the best score and consecutive count
+        // Use Int.min as sentinel for "not reachable"
+        let sentinel = Int.min
+
+        // prevRow[c] = (score, consecutive) for current query index,
+        // where the match ends at candidate position c.
+        // We process query chars one at a time, keeping only the current
+        // and previous rows.
+        var prevRow: [(score: Int, consecutive: Int)] = Array(repeating: (sentinel, 0), count: cLen)
+        var currRow: [(score: Int, consecutive: Int)] = Array(repeating: (sentinel, 0), count: cLen)
+
+        // Fill first query char (q = 0)
+        for c in 0..<cLen {
+            guard candidateChars[c] == queryChars[0] else { continue }
+
+            var matchScore = Bonus.base
+
+            // Prefix bonus
+            if c == 0 {
+                matchScore += Bonus.prefix
+            }
+
+            // Word boundary bonus
+            if isWordBoundary(candidateOriginal: candidateOriginal, index: c) {
+                matchScore += Bonus.wordBoundary
+            }
+
+            // No gap penalty for first char position choices — we just pick where to start
+            // But penalize distance from start for non-prefix matches
+            if c > 0 {
+                matchScore -= Penalty.gap * min(c, Penalty.maxGap)
+            }
+
+            prevRow[c] = (matchScore, 1)
         }
 
-        // Word boundary match — query matches the start of any word
-        // Split on original candidate (preserves camelCase info), then lowercase words
-        let words = splitIntoWords(candidate)
-        for word in words {
-            if word.lowercased().hasPrefix(lowerQuery) {
-                return 75
+        // Fill remaining query chars
+        for q in 1..<qLen {
+            // Reset current row
+            for c in 0..<cLen {
+                currRow[c] = (sentinel, 0)
+            }
+
+            // Track the best score from "far" predecessors (gap >= maxGap,
+            // where the penalty is capped and constant).
+            var bestFarScore = sentinel
+
+            for c in q..<cLen {
+                // Update far-predecessor tracking: positions where gap to any
+                // future c would be >= maxGap get constant penalty.
+                let farCutoff = c - Penalty.maxGap - 1
+                if farCutoff >= 0 && prevRow[farCutoff].score > bestFarScore {
+                    bestFarScore = prevRow[farCutoff].score
+                }
+
+                guard candidateChars[c] == queryChars[q] else { continue }
+
+                let boundaryBonus = isWordBoundary(candidateOriginal: candidateOriginal, index: c)
+                    ? Bonus.wordBoundary : 0
+
+                // Option A: best non-consecutive match considering gap penalty.
+                // Check nearby predecessors (within maxGap) individually since
+                // each has a different gap penalty, plus the best far predecessor
+                // which pays the capped penalty.
+                var scoreA = sentinel
+
+                // Far predecessors: gap >= maxGap, constant penalty
+                if bestFarScore != sentinel {
+                    scoreA = bestFarScore + Bonus.base + boundaryBonus
+                        - Penalty.gap * Penalty.maxGap
+                }
+
+                // Near predecessors: gap in 1..<maxGap (positions c-maxGap..<c-1)
+                // c-1 is handled by option B (consecutive), so skip it here.
+                let nearStart = max(q - 1, c - Penalty.maxGap)
+                for j in nearStart..<(c - 1) {
+                    guard prevRow[j].score != sentinel else { continue }
+                    let gap = c - j - 1
+                    let s = prevRow[j].score + Bonus.base + boundaryBonus
+                        - Penalty.gap * gap
+                    if s > scoreA { scoreA = s }
+                }
+
+                // Option B: consecutive match (from prevRow[c-1] directly)
+                var scoreB = sentinel
+                if prevRow[c - 1].score != sentinel {
+                    let prevConsecutive = prevRow[c - 1].consecutive
+                    let newConsecutive = prevConsecutive + 1
+                    let cappedConsecutive = min(newConsecutive, Bonus.maxConsecutive)
+                    scoreB = prevRow[c - 1].score + Bonus.base
+                        + Bonus.consecutive * cappedConsecutive + boundaryBonus
+                }
+
+                // Pick the best option
+                if scoreB >= scoreA && scoreB != sentinel {
+                    let newConsecutive = prevRow[c - 1].consecutive + 1
+                    currRow[c] = (scoreB, newConsecutive)
+                } else if scoreA != sentinel {
+                    currRow[c] = (scoreA, 1)
+                }
+            }
+
+            // Swap rows
+            let temp = prevRow
+            prevRow = currRow
+            currRow = temp
+        }
+
+        // Find the best score across all ending positions for the last query char
+        var best = sentinel
+        for c in 0..<cLen {
+            if prevRow[c].score > best {
+                best = prevRow[c].score
             }
         }
 
-        // Substring match
-        if lowerCandidate.contains(lowerQuery) {
-            return 50
-        }
-
-        // No match
-        return 0
+        // Clamp: 0 means no match
+        return best == sentinel ? 0 : max(best, 1)
     }
 
-    /// Split a string into words at common boundaries:
-    /// spaces, hyphens, underscores, slashes, dots, and camelCase transitions.
-    private static func splitIntoWords(_ text: String) -> [String] {
-        var words: [String] = []
-        var current = ""
+    // MARK: - Private
 
-        for (index, char) in text.enumerated() {
-            if char == " " || char == "-" || char == "_" || char == "/" || char == "." {
-                if !current.isEmpty {
-                    words.append(current)
-                    current = ""
-                }
-            } else if char.isUppercase && index > 0 {
-                // camelCase boundary
-                if !current.isEmpty {
-                    words.append(current)
-                    current = ""
-                }
-                current.append(char)
-            } else {
-                current.append(char)
-            }
+    /// Check if the character at `index` is at a word boundary.
+    /// Word boundaries: start of string, after space/hyphen/underscore/slash/dot,
+    /// or camelCase transition (lowercase → uppercase).
+    private static func isWordBoundary(candidateOriginal: [Character], index: Int) -> Bool {
+        if index == 0 { return true }
+        let prev = candidateOriginal[index - 1]
+        if prev == " " || prev == "-" || prev == "_" || prev == "/" || prev == "." {
+            return true
         }
-
-        if !current.isEmpty {
-            words.append(current)
+        // camelCase: previous is lowercase, current is uppercase
+        if prev.isLowercase && candidateOriginal[index].isUppercase {
+            return true
         }
+        return false
+    }
 
-        return words
+    // MARK: - Scoring Constants
+
+    private enum Bonus {
+        static let base = 10
+        static let prefix = 20
+        static let wordBoundary = 12
+        static let consecutive = 8
+        static let maxConsecutive = 5
+    }
+
+    private enum Penalty {
+        static let gap = 3
+        static let maxGap = 5
     }
 }

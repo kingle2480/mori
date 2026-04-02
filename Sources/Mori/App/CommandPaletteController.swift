@@ -77,31 +77,48 @@ final class CommandPaletteController: NSWindowController {
     // MARK: - Public
 
     /// Toggle palette visibility.
+    /// If the project-only filter is active, switch to full palette instead of dismissing.
     func toggle() {
-        if let panel = window, panel.isVisible {
+        if let panel = window, panel.isVisible, dataSource?.itemFilter == nil {
             dismiss()
         } else {
             show()
         }
     }
 
+    /// Show palette filtered to projects only (Cmd+P).
+    func showProjectsOnly() {
+        dataSource?.itemFilter = { item in
+            if case .project = item { return true }
+            return false
+        }
+        searchField.placeholderString = .localized("Switch project...")
+        presentPalette()
+    }
+
     func show() {
-        guard let panel = window else { return }
-
-        // Reset state
-        searchField.stringValue = ""
-        selectedIndex = 0
-        updateResults()
-
-        // Center above the main window
-        positionPanel()
-
-        panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(searchField)
+        // Clear filter for full palette
+        dataSource?.itemFilter = nil
+        searchField.placeholderString = .localized("Search projects, worktrees, windows, actions...")
+        presentPalette()
     }
 
     func dismiss() {
         window?.orderOut(nil)
+    }
+
+    // MARK: - Private Helpers
+
+    private func presentPalette() {
+        guard let panel = window else { return }
+
+        searchField.stringValue = ""
+        selectedIndex = 0
+        updateResults()
+        positionPanel()
+
+        panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(searchField)
     }
 
     // MARK: - Setup
