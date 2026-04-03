@@ -860,6 +860,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         appMenu.addItem(installCLIItem)
         appMenu.addItem(.separator())
         appMenu.addItem(configurableMenuItem("other.openProject", title: .localized("Open Project…"), action: #selector(openProjectMenuAction)))
+        appMenu.addItem(configurableMenuItem("other.remoteConnect", title: .localized("Remote Connect…"), action: #selector(remoteConnectMenuAction)))
         appMenu.addItem(.separator())
         appMenu.addItem(configurableMenuItem("settings.open", title: .localized("Settings…"), action: #selector(showSettingsMenuAction)))
         appMenu.addItem(configurableMenuItem("settings.reload", title: .localized("Reload Settings"), action: #selector(reloadSettingsMenuAction)))
@@ -1173,6 +1174,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     @objc private func openProjectMenuAction() {
         showAddProjectPanel()
+    }
+
+    @objc private func remoteConnectMenuAction() {
+        showRemoteConnectWizard()
     }
 
     @objc private func toggleSidebarMenuAction() {
